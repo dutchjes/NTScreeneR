@@ -87,7 +87,8 @@ server <- function(input, output, session){
   })
   
   rv <- reactiveValues(masses = c(), ## masses to populate mass dropdown
-                       rts = c(), ## rts to populate rt dropdown
+                       rts_min = c(), ## rts to populate rt dropdown
+                       rts_sec = c(),
                        names = c(),
                        ESImodes = c(),
                        col = c(),
@@ -133,12 +134,17 @@ server <- function(input, output, session){
     rv$masses <- as.numeric(as.character(P_data()[,take]))
 
     tike <- which(colnames(P_data()) == input$rtcol)
-    rv$rts <- as.numeric(as.character(P_data()[,tike]))
     if(input$rtunit == "seconds"){
-      rv$rts <- as.numeric(as.character(P_data()[,tike])) / 60
+      rv$rts_min <- as.numeric(as.character(P_data()[,tike])) / 60
+      rv$rts_sec <- as.numeric(as.character(P_data()[,tike]))
     }
+    if(input$rtunit == "minutes"){
+      rv$rts_min <- as.numeric(as.character(P_data()[,tike]))
+      rv$rts_sec <- as.numeric(as.character(P_data()[,tike])) * 60
+    }
+    
 
-    rv$features <- paste(rv$masses, rv$rts, sep = "_")
+    rv$features <- paste(rv$masses, rv$rts_min, sep = "_")
     updateSelectInput(session, "feature", choices = rv$features)
 
     toke <- which(colnames(P_data()) == input$IDcol)
@@ -196,8 +202,8 @@ server <- function(input, output, session){
     
     process.file2 <- which(rv$filename == input$RAWFileEIC)
     process.feature <- which(rv$features == input$feature)
-    rtlim.small <- rv$rts[process.feature] - input$rtwind
-    rtlim.large <- rv$rts[process.feature] + input$rtwind
+    rtlim.small <- rv$rts_sec[process.feature] - input$rtwind
+    rtlim.large <- rv$rts_sec[process.feature] + input$rtwind
   #  ppm <- ppm(rv$masses[process.feature], input$masstol, p = T)
   #  mzwidth <- as.numeric(rv$mzmax[process.feature]) - as.numeric(rv$mzmin[process.feature])
     
@@ -211,9 +217,10 @@ server <- function(input, output, session){
          # rtlim = c(rtlim.small, rtlim.large), 
           width = mzWindow(rv$masses[process.feature], input$masstol),
          points = TRUE, legend = TRUE, main = rv$features[process.feature])
-      abline(v = rv$rts[process.feature]*60, col = "blue", lwd = 2)
+      abline(v = rv$rts_sec[process.feature], col = "blue", lwd = 2)
           
-    }, height = 1000, width = 1200)
+    }, height = 1000, width = 1200
+    )
         
         output$Compound <- renderText({paste(rv$names[process.feature])})
   })
@@ -257,7 +264,7 @@ server <- function(input, output, session){
         {
         index <- which(rv$masses == x);
         try(xic(ms, x, width = mzWindow(x, input$masstol), points = TRUE, main = rv$features[index]));
-        try(abline(v = as.numeric(as.character(rv$rts[index])) * 60, col = "blue", lwd = 2))
+        try(abline(v = as.numeric(as.character(rv$rts_sec[index])), col = "blue", lwd = 2))
         })
         )
       
