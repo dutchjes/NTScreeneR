@@ -56,9 +56,11 @@ ui <- fluidPage(
         tabPanel("Data Output", 
           
           checkboxGroupInput(inputId = "RAWFileOutput", label = "Files to process:", choices = c(), inline = TRUE), ##  filled with names in filedir
+          actionButton("selectall", "Select All Files"),
           #checkboxInput(inputId = "pdf", label = "Save images to pdf?"), 
           textInput(inputId = "outputdir", label = "Directory to save pdf:"),
           actionButton(inputId = "process", label = "Save to pdf")
+
         )
       )
     )
@@ -217,9 +219,21 @@ server <- function(input, output, session){
   })
   
   
-  observeEvent(input$RAWFileOutput, {
+  observeEvent(c(input$RAWFileOutput,input$selectall), {
     
-    rv$allcalc <- input$RAWFileOutput
+    if(input$selectall == 0){
+      rv$allcalc <- input$RAWFileOutput
+      
+    }else if(input$selectall%%2 == 0){
+      updateCheckboxGroupInput(session, "RAWFileOutput", choices = rv$filename)
+      rv$allcalc <- input$RAWFileOutput
+      
+    }else{
+      updateCheckboxGroupInput(session, "RAWFileOutput", choices = rv$filename, selected = rv$filename)
+      rv$allcalc <- input$RAWFileOutput
+      
+    }
+    
   })
   
   
