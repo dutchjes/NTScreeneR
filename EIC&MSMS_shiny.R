@@ -97,8 +97,8 @@ server <- function(input, output, session){
                        fteic = c(),
                        hdeic = c(),
                        allcalc = c(),
-                       mzmin = c(),
-                       mzmax = c(),
+                      # mzmin = c(),
+                      # mzmax = c(),
                        msms = list())
   
   
@@ -146,8 +146,8 @@ server <- function(input, output, session){
     # tuke <- which(colnames(P_data()) == input$ioncol)
     # rv$ESImodes <- unique(P_data()[,tuke])
     
-    rv$mzmax <- sapply(rv$masses, function(x) (x + ppm(x, input$masstol, p = TRUE)))
-    rv$mzmin <- sapply(rv$masses, function(x) (x - ppm(x, input$masstol, p = TRUE)))
+  #  rv$mzmax <- sapply(rv$masses, function(x) (x + ppm(x, input$masstol, p = TRUE)))
+  #  rv$mzmin <- sapply(rv$masses, function(x) (x - ppm(x, input$masstol, p = TRUE)))
   })
   
   # observeEvent(input$ionization,{
@@ -196,7 +196,7 @@ server <- function(input, output, session){
     process.feature <- which(rv$features == input$feature)
     rtlim.small <- rv$rts[process.feature] - input$rtwind
     rtlim.large <- rv$rts[process.feature] + input$rtwind
-    ppm <- ppm(rv$masses[process.feature], input$masstol, p = T)
+  #  ppm <- ppm(rv$masses[process.feature], input$masstol, p = T)
   #  mzwidth <- as.numeric(rv$mzmax[process.feature]) - as.numeric(rv$mzmin[process.feature])
     
     
@@ -209,7 +209,7 @@ server <- function(input, output, session){
          # rtlim = c(rtlim.small, rtlim.large), 
           width = mzWindow(rv$masses[process.feature], input$masstol),
          points = TRUE, legend = TRUE, main = rv$features[process.feature])
-      abline(v = rv$rts[process.feature]*60, col = "blue", lwd = 3)
+      abline(v = rv$rts[process.feature]*60, col = "blue", lwd = 2)
           
     }, height = 1000, width = 1200)
         
@@ -236,15 +236,15 @@ server <- function(input, output, session){
       pdf(file = paste(input$outputdir, "\\", rv$filename[calcfile], "_PlottedEICs.pdf", sep = ""))
       
       
-      ms <- openMSfile(rv$filepath[calcfile])
-      hd <- header(ms)
+      ms <- try(openMSfile(rv$filepath[calcfile]))
+      hd <- try(header(ms))
 
-      sapply(rv$masses, function(x) 
+      sapply(rv$masses, try(function(x) 
         {
-        index <- which(rv$masses == x)
-        try(xic(ms, x, width = mzWindow(x, input$masstol), points = TRUE, main = rv$features[index]))
-     #   abline(v = rv$rts[index])
-        }
+        index <- which(rv$masses == x);
+        try(xic(ms, x, width = mzWindow(x, input$masstol), points = TRUE, main = rv$features[index]));
+        try(abline(v = as.numeric(as.character(rv$rts[index])) * 60, col = "blue", lwd = 2))
+        })
         )
       
       dev.off()
