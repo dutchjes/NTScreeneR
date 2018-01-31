@@ -24,7 +24,7 @@ ui <- fluidPage(
       selectInput(inputId = "ionization", label = "Which Ionization mode?", choices = c()),
       
       selectInput(inputId = "feature", label = "feature to extract", choices = c()), ## filled with masses from P_data
-      numericInput(inputId = "masstol", label = "ppm tolerence", value = c(5)),
+      numericInput(inputId = "masstol", label = "ppm tolerence", value = c(10)),
       numericInput(inputId = "rtwind", label = "rt window (sec)", value = c(60)), ## user selected
       
       textInput(inputId = "filedir", label = "Directory with mzXML files:"), ## path to RAW files
