@@ -263,33 +263,35 @@ server <- function(input, output, session){
       
       output$status <- renderText({"Ready to plot EIC..."})
     
-    rv$feic.ms1 <- try(readMSData(rv$filepath[process.file2], centroided. = TRUE, msLevel. = 1, mode = "onDisk"))
-    rv$hdeic.ms1 <- try(header(rv$feic.ms1))
+    rv$feic.ms1 <- readMSData(rv$filepath[process.file2], centroided. = TRUE, msLevel. = 1, mode = "onDisk")
+    rv$hdeic.ms1 <- header(rv$feic.ms1)
 
-    rv$feic.ms2 <- try(readMSData(rv$filepath[process.file2], centroided. = TRUE, msLevel. = 2, mode = "onDisk"))
-    rv$hdeic.ms2 <- try(header(rv$feic.ms2))
+    rv$feic.ms2 <- readMSData(rv$filepath[process.file2], centroided. = TRUE, msLevel. = 2, mode = "onDisk")
+    rv$hdeic.ms2 <- header(rv$feic.ms2)
 
     output$EIC <- renderPlot({
 
     if(input$useRT == TRUE){
 
-      eic <- chromatogram(rv$feic.ms1, rt = rtbounds(rv$rts_sec[process.feature], input$rtwind), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
-      plot(eic)
-      abline(v = rv$rts_sec[process.feature], col = "blue")
-      ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[process.feature], input$masstol)
-      if(is.na(ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
-      points(ms2.data, col = "red", pch = 16)
-
-    }else{
       
-      eic <- chromatogram(rv$feic.ms1, rt = rtbounds(rv$rts_sec[process.feature], input$rtwind), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
+      eic <- chromatogram(rv$feic.ms1, rt = c(min(rtime(rv$feic.ms1)),max(rtime(rv$feic.ms1))), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
       ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[process.feature], input$masstol) ### problem with plotting ms2 scans comes from shortened eic
       ### with the smaller rtbounds. need to adjust the function
       ### findMS2 to look for the right acquisitionScan rather than
       ### with a which function
       
+      eic <- chromatogram(rv$feic.ms1, rt = rtbounds(rv$rts_sec[process.feature], input$rtwind), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
+      plot(eic)
+      abline(v = rv$rts_sec[process.feature], col = "blue")
+      #ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[process.feature], input$masstol)
+      if(is.na(ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
+      points(ms2.data, col = "red", pch = 16)
 
+    }else{
+      
       eic <- chromatogram(rv$feic.ms1, rt = c(min(rtime(rv$feic.ms1)),max(rtime(rv$feic.ms1))), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
+      ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[process.feature], input$masstol) ### problem with plotting ms2 scans comes from shortened eic
+      
       plot(eic)
       abline(v = rv$rts_sec[process.feature], col = "blue")
       if(is.na(ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
