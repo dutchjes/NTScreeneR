@@ -318,58 +318,91 @@ server <- function(input, output, session){
   }
   })
 
-  # 
-  # observeEvent(c(input$RAWFileOutput,input$selectall), {
-  #   
-  #   if(input$selectall == 0){
-  #     rv$allcalc <- input$RAWFileOutput
-  #     
-  #   }else if(input$selectall%%2 == 0){
-  #     updateCheckboxGroupInput(session, "RAWFileOutput", choices = rv$filename)
-  #     rv$allcalc <- input$RAWFileOutput
-  #     
-  #   }else{
-  #     updateCheckboxGroupInput(session, "RAWFileOutput", choices = rv$filename, selected = rv$filename)
-  #     rv$allcalc <- input$RAWFileOutput
-  #     
-  #   }
-  #   
-  # })
-  # 
-  # 
-  # observeEvent(input$process,{
-  #   
-  #   #output.dir <- input$outputdir
-  #   
-  #   for(i in 1:length(rv$allcalc)){
-  #     
-  #     calcfile <- which(rv$filename == input$RAWFileOutput[i])
-  #     
-  #     output$status <- renderText({paste("Working on file ", input$RAWFileOutput[i], sep = "")})
-  #     
-  #     pdf(file = paste(input$outputdir, "\\", rv$filename[calcfile], "_PlottedEICs.pdf", sep = ""))
-  #     
-  #     
-  #     ms <- try(openMSfile(rv$filepath[calcfile]))
-  #     hd <- try(header(ms))
-  # 
-  #     sapply(rv$masses, try(function(x) 
-  #       {
-  #       index <- which(rv$masses == x);
-  #       try(xic(ms, x, width = mzWindow(x, input$masstol), points = TRUE, main = rv$features[index]));
-  #       try(abline(v = as.numeric(as.character(rv$rts_sec[index])), col = "blue", lwd = 2))
-  #       })
-  #       )
-  #     
-  #     dev.off()
-  #     
-  #     if(i == length(rv$allcalc)){
-  #       
-  #       output$status <- renderText({paste("Finished building pdfs")})
-  #     }
-  #   }
-  #     
-  #   })
+
+  observeEvent(c(input$RAWFileOutput,input$selectall), {
+
+    if(input$selectall == 0){
+      rv$allcalc <- input$RAWFileOutput
+
+    }else if(input$selectall%%2 == 0){
+      updateCheckboxGroupInput(session, "RAWFileOutput", choices = rv$filename)
+      rv$allcalc <- input$RAWFileOutput
+
+    }else{
+      updateCheckboxGroupInput(session, "RAWFileOutput", choices = rv$filename, selected = rv$filename)
+      rv$allcalc <- input$RAWFileOutput
+
+    }
+
+  })
+
+
+  observeEvent(input$process,{
+
+    #output.dir <- input$outputdir
+
+    for(i in 1:length(rv$allcalc)){
+
+      calcfile <- which(rv$filename == rv$allcalc[i])
+
+      output$status <- renderText({paste("Working on file ", rv$allcalc[i], sep = "")})
+
+      pdf(file = paste(input$outputdir, "\\", rv$filename[calcfile], "_PlottedEICs.pdf", sep = ""))
+
+
+      ms1 <- readMSData(rv$filepath[calcfile], centroided. = TRUE, msLevel. = 1, mode = "onDisk")
+      ms1.hd <- header(ms1)
+      
+      ms2 <- readMSData(rv$filepath[calcfile], centroided. = TRUE, msLevel. = 2, mode = "onDisk")
+      ms2.hd <- header(ms2)
+      
+      sapply(rv$masses, function(x){
+        # {
+        # index <- which(rv$masses == x);
+        # try(xic(ms, x, width = mzWindow(x, input$masstol), points = TRUE, main = rv$features[index]));
+        # try(abline(v = as.numeric(as.character(rv$rts_sec[index])), col = "blue", lwd = 2))
+        # }
+        
+        if(input$useRT == TRUE){
+
+          index <- which(rv$masses == x)
+          
+          eic <- chromatogram(ms1, rt = c(min(rtime(ms1)),max(rtime(ms1))), mz = ppm(rv$masses[index], input$masstol, l = TRUE))
+          ms2.data <- findMS2(ms1.hd, ms2.hd, eic, rv$masses[index], input$masstol)
+          
+          
+          eic <- chromatogram(ms1, rt = rtbounds(rv$rts_sec[index], input$rtwind), mz = ppm(rv$masses[index], input$masstol, l = TRUE))
+          plot(eic)
+          abline(v = rv$rts_sec[index], col = "blue")
+        #  ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[index], input$masstol)
+          if(is.na(ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
+          points(ms2.data, col = "red", pch = 16)
+
+        }else{
+
+         index <- which(rv$masses == x)
+        
+          eic <- chromatogram(ms1, rt = c(min(rtime(ms1)),max(rtime(ms1))), mz = ppm(rv$masses[index], input$masstol, l = TRUE))
+          ms2.data <- findMS2(ms1.hd, ms2.hd, eic, rv$masses[index], input$masstol)
+
+          plot(eic)
+          abline(v = rv$rts_sec[index], col = "blue")
+          if(is.na(ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
+          points(ms2.data, col = "red", pch = 16)
+          
+        }
+      }
+    )
+
+      dev.off()
+
+      if(i == length(rv$allcalc)){
+
+        output$status <- renderText({paste("Finished building pdfs")})
+      }
+    }
+
+    })
 
 }
 
