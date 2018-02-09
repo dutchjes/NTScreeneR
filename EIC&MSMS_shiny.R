@@ -103,7 +103,7 @@ server <- function(input, output, session){
     
     mzlimits <- ppm(precursor.mz, mztol, l = TRUE)
     ms2.scans <- which(hd.ms2$precursorMZ < mzlimits[1] & hd.ms2$precursorMZ > mzlimits[2])
-    if(length(ms2.scans)==0){return("NA")}
+    if(length(ms2.scans)==0){return(NA)}
     ms1.scans <- sapply(ms2.scans, function(x) which.min(abs(hd.ms1$acquisitionNum - hd.ms2$acquisitionNum[x])))
     
     eic.int <- eic@.Data[[1]]@intensity[ms1.scans]
@@ -290,8 +290,10 @@ server <- function(input, output, session){
       eic <- chromatogram(rv$feic.ms1, rt = rtbounds(rv$rts_sec[process.feature], input$rtwind), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
       plot(eic)
       abline(v = rv$rts_sec[process.feature], col = "blue")
-      if(is.na(rv$ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
-      points(rv$ms2.data[,2:3], col = "red", pch = 16)
+      if(is.na(rv$ms2.data))
+        legend("topleft", legend = paste("No MS2 scans"))
+      else 
+        points(rv$ms2.data[,2:3], col = "red", pch = 16)
       
       updateSelectInput(session, "selectedMSMS", choices = rv$ms2.data[,1])
 
@@ -302,8 +304,10 @@ server <- function(input, output, session){
       
       plot(eic)
       abline(v = rv$rts_sec[process.feature], col = "blue")
-      if(is.na(rv$ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
-      points(rv$ms2.data[,2:3], col = "red", pch = 16)
+      if(is.na(rv$ms2.data))
+        legend("topleft", legend = paste("No MS2 scans"))
+      else
+        points(rv$ms2.data[,2:3], col = "red", pch = 16)
 
       updateSelectInput(session, "selectedMSMS", choices = rv$ms2.data[,1])
     }
