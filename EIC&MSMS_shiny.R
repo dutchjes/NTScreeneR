@@ -105,7 +105,8 @@ server <- function(input, output, session){
     
     eic.int <- eic@.Data[[1]]@intensity[ms1.scans]
     ms2.rt <- hd.ms2$retentionTime[ms2.scans]
-    return(cbind(ms2.rt, eic.int))
+    scan.nm <- hd.ms2$acquisitionNum[ms2.scans]
+    return(cbind(scan.nm  = scan.nm, ms2.rt = ms2.rt, eic.int = eic.int))
     
   }
   
@@ -132,7 +133,8 @@ server <- function(input, output, session){
                        allcalc = c(),
                       # mzmin = c(),
                       # mzmax = c(),
-                       msms = list())
+                       msms = list(),
+                      ms2.data = c())
   
   
   observeEvent(input$P_data,{
@@ -273,34 +275,38 @@ server <- function(input, output, session){
 
     if(input$useRT == TRUE){
 
-      
+     ## first the whole eic to get the correct ms2 acquisitionScans 
       eic <- chromatogram(rv$feic.ms1, rt = c(min(rtime(rv$feic.ms1)),max(rtime(rv$feic.ms1))), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
-      ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[process.feature], input$masstol) ### problem with plotting ms2 scans comes from shortened eic
-      ### with the smaller rtbounds. need to adjust the function
-      ### findMS2 to look for the right acquisitionScan rather than
-      ### with a which function
-      
+      rv$ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[process.feature], input$masstol) 
+
+     ## now the shortened eic to plot 
       eic <- chromatogram(rv$feic.ms1, rt = rtbounds(rv$rts_sec[process.feature], input$rtwind), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
       plot(eic)
       abline(v = rv$rts_sec[process.feature], col = "blue")
-      #ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[process.feature], input$masstol)
-      if(is.na(ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
-      points(ms2.data, col = "red", pch = 16)
+      if(is.na(rv$ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
+      points(rv$ms2.data[,2:3], col = "red", pch = 16)
+      
+      updateSelectInput(session, "selectedMSMS", choices = rv$ms2.data[,1])
 
     }else{
       
       eic <- chromatogram(rv$feic.ms1, rt = c(min(rtime(rv$feic.ms1)),max(rtime(rv$feic.ms1))), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
-      ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[process.feature], input$masstol) ### problem with plotting ms2 scans comes from shortened eic
+      rv$ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[process.feature], input$masstol) ### problem with plotting ms2 scans comes from shortened eic
       
       plot(eic)
       abline(v = rv$rts_sec[process.feature], col = "blue")
-      if(is.na(ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
-      points(ms2.data, col = "red", pch = 16)
+      if(is.na(rv$ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
+      points(rv$ms2.data[,2:3], col = "red", pch = 16)
 
+      updateSelectInput(session, "selectedMSMS", choices = rv$ms2.data[,1])
     }
 
     })
-
+    
+    output$availMSMSscans <- renderTable({
+      rv$ms2.data
+    })
+    
     # output$EIC <- renderPlot({
     #
     #   xic(rv$feic, mz = rv$masses[process.feature],
@@ -315,9 +321,22 @@ server <- function(input, output, session){
         output$Compound <- renderText({paste(rv$names[process.feature])})
         output$status <- renderText({"Finished"})
         
-  }
+    }
+    
+    observeEvent(input$selectedMSMS, 
+                 
+                 output$MSMS <- renderPlot({
+                   plot(rv$feic.ms2[[which(rv$hdeic.ms2$acquisitionNum == input$selectedMSMS)]], reporters = NULL, full = TRUE) + theme_bw()
+      #spec <- rv$hdeic.ms2[[paste(input$selectedMSMS)]]
+      #plot(spec, reporters = NULL, full = TRUE)
+    })
+    )
+    
   })
 
+
+               
+               
 
   observeEvent(c(input$RAWFileOutput,input$selectall), {
 
