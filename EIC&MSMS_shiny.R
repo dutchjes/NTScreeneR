@@ -40,20 +40,23 @@ ui <- fluidPage(
         tabPanel("Data", tableOutput(outputId = "userP_data")),
         
         tabPanel("TIC", 
+                 selectInput(inputId = "RAWFileTIC", label = "Current mzXML file:", choices = c(), multiple = FALSE), ##  filled with names in filedir
                  actionButton(inputId = "createTIC", label = "Create TIC"),
                  plotOutput(outputId = "TIC"),
                  actionButton(inputId = "create2d", label = "Create 2d plot"),
                  plotOutput(outputId = "plot2d"),
-                 selectInput(inputId = "coloring", label = "Color points according to:", choices = c("ionCount", "file", "peaks.count", "charge")),
-                 selectInput(inputId = "RAWFileTIC", label = "Current mzXML file:", choices = c(), multiple = FALSE) ##  filled with names in filedir
+                 selectInput(inputId = "coloring", label = "Color points according to:", choices = c("ionCount", "file", "peaks.count", "charge"))
                  ),
         
         tabPanel("EIC", 
-                 actionButton(inputId = "createEIC", label = "Create EIC"),
                  selectInput(inputId = "feature", label = "feature to extract", choices = c()), ## filled with masses from P_data
+                 selectInput(inputId = "RAWFileEIC", label = "Current mzXML file:", choices = c(), multiple = FALSE), ##  filled with names in filedir
+                 actionButton(inputId = "createEIC", label = "Create EIC"),
                  textOutput(outputId = "Compound"),
                  plotOutput(outputId = "EIC"),
-                 selectInput(inputId = "RAWFileEIC", label = "Current mzXML file:", choices = c(), multiple = FALSE) ##  filled with names in filedir
+                 tableOutput(outputId = "availMSMSscans"),
+                 selectInput(inputId = "selectedMSMS", label = "Which MSMS to plot?", choices = c()),
+                 plotOutput(outputId = "MSMS")
                  ),
         
         tabPanel("MS2 Spectra",
@@ -207,7 +210,9 @@ server <- function(input, output, session){
     
   })
   
-
+  ##########################
+  ### Plotting the TIC in Shiny
+  
   observeEvent(input$createTIC,{
 
       process.file1 <- which(rv$filename == input$RAWFileTIC)
@@ -246,6 +251,8 @@ server <- function(input, output, session){
 
   });
   
+  ##########################
+  ### Plotting the EIC in Shiny
   
   observeEvent(input$createEIC,{
 
