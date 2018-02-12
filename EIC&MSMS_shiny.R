@@ -48,7 +48,7 @@ ui <- fluidPage(
                  selectInput(inputId = "coloring", label = "Color points according to:", choices = c("ionCount", "file", "peaks.count", "charge"))
                  ),
         
-        tabPanel("EIC", 
+        tabPanel("EIC and MS2", 
                  selectInput(inputId = "feature", label = "feature to extract", choices = c()), ## filled with masses from P_data
                  selectInput(inputId = "RAWFileEIC", label = "Current mzXML file:", choices = c(), multiple = FALSE), ##  filled with names in filedir
                  actionButton(inputId = "createEIC", label = "Create EIC"),
@@ -59,10 +59,17 @@ ui <- fluidPage(
                  plotOutput(outputId = "MSMS")
                  ),
         
-        tabPanel("MS2 Spectra",
-                 selectInput(inputId = "MS2feature", label = "feature to extract", choices = c()), ## filled with masses from P_data
-                 plotOutput(outputId = "MS2plot"),
-                 selectInput(inputId = "RAWFileMS2", label = "Current mzXML file:", choices = c(), multiple = FALSE) ##  filled with names in filedir
+        tabPanel("MS2 Output",
+                # fileInput(inputId = "MS2topull", label = "Upload file with precursor masses and data files"),
+                 selectInput(inputId = "MS2filecol", label = "Column with mzXMLs to extract MS2", choices = c()),
+                 selectInput(inputId = "reffilecol", label = "Column with mzXMLs to extract reference MS2", choices = c()),
+                 textInput(inputId = "MS2outputdir", label = "Directory to save MS2 pdfs:"),
+                 #tableOutput(outputId = "userMS2data"),
+                 actionButton(inputId = "processMS2", label = "Save MS2s to pdf")
+                 #checkboxGroupInput(inputId = "MS2Output")
+                 #selectInput(inputId = "MS2feature", label = "feature to extract", choices = c()), ## filled with masses from P_data
+                 #plotOutput(outputId = "MS2plot"),
+                 #selectInput(inputId = "RAWFileMS2", label = "Current mzXML file:", choices = c(), multiple = FALSE) ##  filled with names in filedir
                  ),
         
         tabPanel("Data Output", 
@@ -137,7 +144,8 @@ server <- function(input, output, session){
                       # mzmin = c(),
                       # mzmax = c(),
                        msms = list(),
-                      ms2.data = c())
+                       ms2.data = c(),
+                       ms2.files = c())
   
   
   observeEvent(input$P_data,{
@@ -147,6 +155,8 @@ server <- function(input, output, session){
     updateSelectInput(session, "rtcol", choices = rv$col)
     updateSelectInput(session, "IDcol", choices = rv$col)
     updateSelectInput(session, "ioncol", choices = rv$col)
+    updateSelectInput(session, "MS2filecol", choices = rv$col)
+    updateSelectInput(session, "reffilecol", choices = rv$col)
     
   })
  
@@ -188,17 +198,10 @@ server <- function(input, output, session){
     
     # tuke <- which(colnames(P_data()) == input$ioncol)
     # rv$ESImodes <- unique(P_data()[,tuke])
-    
-  #  rv$mzmax <- sapply(rv$masses, function(x) (x + ppm(x, input$masstol, p = TRUE)))
-  #  rv$mzmin <- sapply(rv$masses, function(x) (x - ppm(x, input$masstol, p = TRUE)))
+
   })
   
-  # observeEvent(input$ionization,{
-  #   
-  #   
-  # })
-  # 
-  
+
   observeEvent(input$filedir,{
     
     rv$filepath <- list.files(input$filedir, pattern = "mzXML", full.names = TRUE, recursive = FALSE)
@@ -331,11 +334,9 @@ server <- function(input, output, session){
     }
     
     observeEvent(input$selectedMSMS, 
-                 
                  output$MSMS <- renderPlot({
                    plot(rv$feic.ms2[[which(rv$hdeic.ms2$acquisitionNum == input$selectedMSMS)]], reporters = NULL, full = TRUE) + theme_bw()
-      #spec <- rv$hdeic.ms2[[paste(input$selectedMSMS)]]
-      #plot(spec, reporters = NULL, full = TRUE)
+
     })
     )
     
@@ -363,6 +364,64 @@ server <- function(input, output, session){
   })
 
 
+  
+  
+  ##########################
+  ### Output the MS/MS in pdfs
+  
+  observeEvent(input$MS2filecol,{
+    
+    get <- which(colnames(P_data()) == input$MS2filecol)
+    rv$ms2.files <- P_data()[,get]
+  })
+  
+  observeEvent(input$processMS2, {
+    
+    pdf(file = paste(input$MS2outputdir, "\\", "ExtractedMS2s.pdf", sep = ""))
+    
+    for(i in 1:length(rv$ms2.files)){
+      
+      process.file <- which(grepl(paste(rv$ms2.files[i]), rv$filename) > 0)
+      output$status <- renderText({paste("Working with file", rv$ms2.files[i], sep = " ")})
+      
+      rv$feic.ms1 <- readMSData(rv$filepath[process.file], centroided. = TRUE, msLevel. = 1, mode = "onDisk")
+      rv$hdeic.ms1 <- header(rv$feic.ms1)
+
+      rv$feic.ms2 <- readMSData(rv$filepath[process.file], centroided. = TRUE, msLevel. = 2, mode = "onDisk")
+      rv$hdeic.ms2 <- header(rv$feic.ms2)
+
+      ## first the whole eic to get the correct ms2 acquisitionScans
+      eic <- chromatogram(rv$feic.ms1, rt = c(min(rtime(rv$feic.ms1)),max(rtime(rv$feic.ms1))), mz = ppm(rv$masses[i], input$masstol, l = TRUE))
+      plot(eic)
+      rv$ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[i], input$masstol)
+      if(is.na(rv$ms2.data))
+        next
+      else{
+      
+      rtlims <- rtbounds(rv$rts_sec[i], input$rtwind)
+      rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
+      get.scan <- which.max(rv$ms2.data[,3])
+      if(length(get.scan)<1)
+        next
+      else
+        plot(rv$feic.ms2[[which(rv$hdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]], reporters = NULL, full = TRUE) + theme_bw()
+      
+    }
+
+    };
+    
+    dev.off()
+    output$status <- renderText({"Finished building MS2 pdfs"})
+    
+      
+  })
+
+  
+  
+  ##################################
+  ### EIC output tab
+  ### add compound name to plot
+  
   observeEvent(input$process,{
 
     #output.dir <- input$outputdir
