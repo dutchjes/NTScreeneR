@@ -128,8 +128,8 @@ server <- function(input, output, session){
   
   rv <- reactiveValues(masses = c(), ## masses to populate mass dropdown
                        rts_min = c(), ## rts to populate rt dropdown
-                       rts_sec = c(),
-                       names = c(),
+                       rts_sec = c(), ## rts for chromatograph function
+                       names = c(), ## names of NTs
                        ESImodes = c(),
                        col = c(),
                        features = c(),
@@ -266,11 +266,6 @@ server <- function(input, output, session){
     if(length(process.file2) == 0){output$status <- renderText({"Waiting for mzXML files..."})}
     if(length(process.feature) == 0){output$status <- renderText({"Waiting for suspect list..."})}
     
-    
-  #  rtlim.small <- rv$rts_sec[process.feature] - input$rtwind
-  #  rtlim.large <- rv$rts_sec[process.feature] + input$rtwind
-  #  ppm <- ppm(rv$masses[process.feature], input$masstol, p = T)
-  #  mzwidth <- as.numeric(rv$mzmax[process.feature]) - as.numeric(rv$mzmin[process.feature])
 
     if(length(process.file2) == 1){
       
@@ -294,10 +289,14 @@ server <- function(input, output, session){
       eic <- chromatogram(rv$feic.ms1, rt = rtbounds(rv$rts_sec[process.feature], input$rtwind), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
       plot(eic)
       abline(v = rv$rts_sec[process.feature], col = "blue")
-      if(is.na(rv$ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
-      points(rv$ms2.data[,2:3], col = "red", pch = 16)
+      if(is.na(rv$ms2.data)[1] == TRUE)
+        legend("topleft", legend = paste("No MS2 scans"))
+      else
+        points(rv$ms2.data[,2:3], col = "red", pch = 16)
       
-      updateSelectInput(session, "selectedMSMS", choices = rv$ms2.data[,1])
+      rtlims <- rtbounds(rv$rts_sec[process.feature], input$rtwind)
+      rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
+
 
     }else{
       
@@ -306,31 +305,23 @@ server <- function(input, output, session){
       
       plot(eic)
       abline(v = rv$rts_sec[process.feature], col = "blue")
-      if(is.na(rv$ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
-      points(rv$ms2.data[,2:3], col = "red", pch = 16)
+      if(is.na(rv$ms2.data)[1] == TRUE)
+        legend("topleft", legend = paste("No MS2 scans"))
+      else
+        points(rv$ms2.data[,2:3], col = "red", pch = 16)
 
-      updateSelectInput(session, "selectedMSMS", choices = rv$ms2.data[,1])
     }
 
     })
     
+    
+    updateSelectInput(session, "selectedMSMS", choices = rv$ms2.data[,1])
     output$availMSMSscans <- renderTable({
       rv$ms2.data
     })
     
-    # output$EIC <- renderPlot({
-    #
-    #   xic(rv$feic, mz = rv$masses[process.feature],
-    #      # rtlim = c(rtlim.small, rtlim.large),
-    #       width = mzWindow(rv$masses[process.feature], input$masstol),
-    #      points = TRUE, legend = TRUE, main = rv$features[process.feature])
-    #   abline(v = rv$rts_sec[process.feature], col = "blue", lwd = 2)
-    #
-    # }, height = 1000, width = 1200
-    # )
-
-        output$Compound <- renderText({paste(rv$names[process.feature])})
-        output$status <- renderText({"Finished"})
+    output$Compound <- renderText({paste(rv$names[process.feature])})
+    output$status <- renderText({"Finished"})
         
     }
     
@@ -344,8 +335,6 @@ server <- function(input, output, session){
   })
 
 
-               
-               
 
   observeEvent(c(input$RAWFileOutput,input$selectall), {
 
@@ -425,7 +414,6 @@ server <- function(input, output, session){
   
   observeEvent(input$process,{
 
-    #output.dir <- input$outputdir
 
     for(i in 1:length(rv$allcalc)){
 
@@ -435,7 +423,6 @@ server <- function(input, output, session){
 
       pdf(file = paste(input$outputdir, "\\", rv$filename[calcfile], "_PlottedEICs.pdf", sep = ""))
 
-
       ms1 <- readMSData(rv$filepath[calcfile], centroided. = TRUE, msLevel. = 1, mode = "onDisk")
       ms1.hd <- header(ms1)
       
@@ -443,26 +430,24 @@ server <- function(input, output, session){
       ms2.hd <- header(ms2)
       
       sapply(rv$masses, function(x){
-        # {
-        # index <- which(rv$masses == x);
-        # try(xic(ms, x, width = mzWindow(x, input$masstol), points = TRUE, main = rv$features[index]));
-        # try(abline(v = as.numeric(as.character(rv$rts_sec[index])), col = "blue", lwd = 2))
-        # }
-        
+
         if(input$useRT == TRUE){
 
           index <- which(rv$masses == x)
           
+          ## plot eic over total runtime to get correct ms2 aquisition numbers
           eic <- chromatogram(ms1, rt = c(min(rtime(ms1)),max(rtime(ms1))), mz = ppm(rv$masses[index], input$masstol, l = TRUE))
           ms2.data <- findMS2(ms1.hd, ms2.hd, eic, rv$masses[index], input$masstol)
           
-          
+          ## get shortened eic for plotting
           eic <- chromatogram(ms1, rt = rtbounds(rv$rts_sec[index], input$rtwind), mz = ppm(rv$masses[index], input$masstol, l = TRUE))
           plot(eic)
           abline(v = rv$rts_sec[index], col = "blue")
         #  ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[index], input$masstol)
-          if(is.na(ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
-          points(ms2.data, col = "red", pch = 16)
+          if(is.na(ms2.data))
+            legend("topleft", legend = paste("No MS2 scans"))
+          else
+            points(ms2.data, col = "red", pch = 16)
 
         }else{
 
@@ -473,8 +458,10 @@ server <- function(input, output, session){
 
           plot(eic)
           abline(v = rv$rts_sec[index], col = "blue")
-          if(is.na(ms2.data)){legend("topleft", legend = paste("No MS2 scans"))}
-          points(ms2.data, col = "red", pch = 16)
+          if(is.na(ms2.data))
+            legend("topleft", legend = paste("No MS2 scans"))
+          else
+            points(ms2.data, col = "red", pch = 16)
           
         }
       }
