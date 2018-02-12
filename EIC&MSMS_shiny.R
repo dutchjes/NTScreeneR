@@ -92,12 +92,12 @@ server <- function(input, output, session){
     
   })
   
-  mzWindow <- function(mz, mztol){
-    max <- mz + ppm(mz, mztol, p = TRUE)
-    min <- mz - ppm(mz, mztol, p = TRUE)
-    wind <- max-min
-    return(wind)
-  }
+  # mzWindow <- function(mz, mztol){
+  #   max <- mz + ppm(mz, mztol, p = TRUE)
+  #   min <- mz - ppm(mz, mztol, p = TRUE)
+  #   wind <- max-min
+  #   return(wind)
+  # }
   
   rtbounds <- function(exp.rt, rtwind){
     
@@ -110,13 +110,14 @@ server <- function(input, output, session){
     
     mzlimits <- ppm(precursor.mz, mztol, l = TRUE)
     ms2.scans <- which(hd.ms2$precursorMZ < mzlimits[1] & hd.ms2$precursorMZ > mzlimits[2])
-    if(length(ms2.scans)==0){return("NA")}
+    if(length(ms2.scans)==0){return(NA)}
     ms1.scans <- sapply(ms2.scans, function(x) which.min(abs(hd.ms1$acquisitionNum - hd.ms2$acquisitionNum[x])))
     
-    eic.int <- eic@.Data[[1]]@intensity[ms1.scans]
-    ms2.rt <- hd.ms2$retentionTime[ms2.scans]
+   # eic.int <- as.numeric(as.character(eic@.Data[[1]]@intensity[ms1.scans]))
+    eic.int <- as.numeric(as.character(hd.ms2$precursorIntensity[ms2.scans]))
+    ms2.rt <- as.numeric(as.character(hd.ms2$retentionTime[ms2.scans]))
     scan.nm <- hd.ms2$acquisitionNum[ms2.scans]
-    return(cbind(scan.nm  = scan.nm, ms2.rt = ms2.rt, eic.int = eic.int))
+    return(as.data.frame(cbind(scan.nm  = scan.nm, ms2.rt = ms2.rt, eic.int = eic.int)))
     
   }
   
