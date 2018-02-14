@@ -407,6 +407,9 @@ server <- function(input, output, session){
             rv$spec.file <- NA
           else
             rv$spec.file <- rv$feic.ms2[[which(rv$hdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]]
+           ce <- rv$hdeic.ms2$collisionEnergy[which(rv$hdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]
+           id.file <- paste(rv$features[i], ce, rv$ms2.files[i], sep = "_")
+          
           
         }
         
@@ -436,16 +439,29 @@ server <- function(input, output, session){
             rv$spec.ref <- NA
           else
             rv$spec.ref <- rv$rfeic.ms2[[which(rv$rhdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]]
+          ce <- rv$rhdeic.ms2$collisionEnergy[which(rv$rhdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]
+          id.ref <- paste(rv$features[i], ce, rv$ref.files[i], sep = "_")
           
         }
         
-        if(!is.na(rv$spec.file) & !is.na(rv$spec.ref))
-          plot(rv$spec.file, rv$spec.ref)
+        if(!is.na(rv$spec.file) & !is.na(rv$spec.ref)){
+          plot(rv$spec.file, rv$spec.ref, main = c(id.file, "/n", id.ref))
+          
+          browser()
+          
+          sink(paste(input$MS2outputdir,"\\", id.file, ".txt", sep = ""))
+          print(rv$spec.file)
+          print(as.data.frame(rv$spec.file))
+          print(rv$spec.ref)
+          print(as.data.frame(rv$spec.ref))
+          sink()
+        }
         else
           next
         
       }
       
+      output$status <- renderText({"Finished building MS2 pdfs"})
       dev.off()
       
     }else{
