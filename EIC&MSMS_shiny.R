@@ -296,6 +296,7 @@ server <- function(input, output, session){
       eic <- chromatogram(rv$feic.ms1, rt = rtbounds(rv$rts_sec[process.feature], input$rtwind), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
       plot(eic)
       abline(v = rv$rts_sec[process.feature], col = "blue")
+
       if(is.na(rv$ms2.data)[1] == TRUE)
         legend("topleft", legend = paste("No MS2 scans"))
       else
@@ -312,6 +313,7 @@ server <- function(input, output, session){
       
       plot(eic)
       abline(v = rv$rts_sec[process.feature], col = "blue")
+
       if(is.na(rv$ms2.data)[1] == TRUE)
         legend("topleft", legend = paste("No MS2 scans"))
       else
