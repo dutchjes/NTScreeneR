@@ -64,6 +64,10 @@ ui <- fluidPage(
                  selectInput(inputId = "MS2filecol", label = "Column with mzXMLs to extract MS2", choices = c()),
                  selectInput(inputId = "reffilecol", label = "Column with mzXMLs to extract reference MS2", choices = c()),
                  checkboxInput(inputId = "htot", label = "Plot head to tail between File and Reference"),
+                 numericInput(inputId = "MSMS_y", label = "m/z weighting factor (y)", value = 0),
+                 numericInput(inputId = "MSMS_z", label = "intensity weighting factor (z)", value = 1),
+                 numericInput(inputId = "MSMS_t", label = "m/z tolerence for merging fragments (Da)", value = 0.005),
+                 numericInput(inputId = "MSMS_b", label = "relative intensity cutoff (%)", value = 1),
                  textInput(inputId = "MS2outputdir", label = "Directory to save MS2 pdfs:"),
                  #tableOutput(outputId = "userMS2data"),
                  actionButton(inputId = "processMS2", label = "Save MS2s to pdf")
@@ -450,17 +454,18 @@ server <- function(input, output, session){
           #plot(rv$spec.file, rv$spec.ref, main = c(id.file, "/n", id.ref),
           #     sub = paste("dot product = ", round(compareSpectra(rv$spec.file, rv$spec.ref, fun = "dotproduct"),3), sep = ""))
           
-          my.spectra <- OrgMSSim(as.data.frame(rv$spec.file), as.data.frame(rv$spec.ref))
+          my.spectra <- OrgMSSim(as.data.frame(rv$spec.file), as.data.frame(rv$spec.ref), y = input$MSMS_y, z = input$MSMS_z, t = input$MSMS_t, b = input$MSMS_b)
           match <- subset(my.spectra[[2]], my.spectra[[2]]$match > 0)
-          
           plot.new()
           plot.window(xlim = c(0,max(my.spectra[[2]]$mz)+50), ylim = c(-1,1))
-          abline(h = 0)
-          points(x = my.spectra[[2]]$mz, y = (my.spectra[[2]]$intensity.top)/max(my.spectra[[2]]$intensity.top), type = "h", col = "grey")
-          points(x = my.spectra[[2]]$mz, y = -(my.spectra[[2]]$intensity.bottom)/max(my.spectra[[2]]$intensity.bottom), type = "h", col = "grey")
-          points(x = match$mz, y = (match$intensity.top)/max(match$intensity.top), type = "h", col = "red")
-          points(x = match$mz, y = -(match$intensity.bottom)/max(match$intensity.bottom), type = "h", col = "blue")
+          points(x = my.spectra[[2]]$mz, y = (my.spectra[[2]][,4])/max(my.spectra[[2]][,4]), type = "h", col = "grey")
+          points(x = my.spectra[[2]]$mz, y = -(my.spectra[[2]][,5])/max(my.spectra[[2]][,5]), type = "h", col = "grey")
+          points(x = match$mz, y = (match[,4])/max(my.spectra[[2]][,4]), type = "h", col = "red")
+          points(x = match$mz, y = -(match[,5])/max(my.spectra[[2]][,5]), type = "h", col = "blue")
           #points(x = match$mz, y = rep(0, nrow(match)), pch = 16, col = "black", cex = 0.8)
+          abline(h = 0)
+          abline(h = input$MSMS_b/100, lty = 2, col = "grey")
+          abline(h = -input$MSMS_b/100, lty = 2, col = "grey")
           axis(side = 1)
           axis(side = 2)
           title(main = c(id.file, "\n", id.ref), sub = paste("similarity score = ", round(my.spectra$score, 3), sep = ""),
