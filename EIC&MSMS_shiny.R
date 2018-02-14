@@ -410,7 +410,7 @@ server <- function(input, output, session){
           else
             rv$spec.file <- rv$feic.ms2[[which(rv$hdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]]
            ce <- rv$hdeic.ms2$collisionEnergy[which(rv$hdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]
-           id.file <- paste(rv$features[i], ce, rv$ms2.files[i], sep = "_")
+           id.file <- paste(rv$features[i], "_NCE", ce, "_", formatC(max(as.data.frame(rv$spec.file)$i), format = "e", 1), "_", rv$ms2.files[i], sep = "")
           
           
         }
@@ -442,14 +442,32 @@ server <- function(input, output, session){
           else
             rv$spec.ref <- rv$rfeic.ms2[[which(rv$rhdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]]
           ce <- rv$rhdeic.ms2$collisionEnergy[which(rv$rhdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]
-          id.ref <- paste(rv$features[i], ce, rv$ref.files[i], sep = "_")
+          id.ref <- paste(rv$features[i], "_NCE", ce, "_", formatC(max(as.data.frame(rv$spec.ref)$i), format = "e", 1), "_", rv$ref.files[i], sep = "")
           
         }
         
         if(!is.na(rv$spec.file) & !is.na(rv$spec.ref)){
-          plot(rv$spec.file, rv$spec.ref, main = c(id.file, "/n", id.ref))
+          #plot(rv$spec.file, rv$spec.ref, main = c(id.file, "/n", id.ref),
+          #     sub = paste("dot product = ", round(compareSpectra(rv$spec.file, rv$spec.ref, fun = "dotproduct"),3), sep = ""))
           
-          browser()
+          my.spectra <- OrgMSSim(as.data.frame(rv$spec.file), as.data.frame(rv$spec.ref))
+          match <- subset(my.spectra[[2]], my.spectra[[2]]$match > 0)
+          
+          plot.new()
+          plot.window(xlim = c(0,max(my.spectra[[2]]$mz)+50), ylim = c(-1,1))
+          abline(h = 0)
+          points(x = my.spectra[[2]]$mz, y = (my.spectra[[2]]$intensity.top)/max(my.spectra[[2]]$intensity.top), type = "h", col = "grey")
+          points(x = my.spectra[[2]]$mz, y = -(my.spectra[[2]]$intensity.bottom)/max(my.spectra[[2]]$intensity.bottom), type = "h", col = "grey")
+          points(x = match$mz, y = (match$intensity.top)/max(match$intensity.top), type = "h", col = "red")
+          points(x = match$mz, y = -(match$intensity.bottom)/max(match$intensity.bottom), type = "h", col = "blue")
+          #points(x = match$mz, y = rep(0, nrow(match)), pch = 16, col = "black", cex = 0.8)
+          axis(side = 1)
+          axis(side = 2)
+          title(main = c(id.file, "\n", id.ref), sub = paste("similarity score = ", round(my.spectra$score, 3), sep = ""),
+                xlab = "Fragment m/z", ylab = "Relative intensity")
+          box()
+          
+          #browser()
           
           sink(paste(input$MS2outputdir,"\\", id.file, ".txt", sep = ""))
           print(rv$spec.file)
