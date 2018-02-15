@@ -9,7 +9,7 @@ library(enviPat)
 library(shiny)
 library(MSnbase)
 library(devtools)
-install_github("dutchjes/MSMSsim", auth_token = "")
+install_github("dutchjes/MSMSsim")
 library(MSMSsim)
 
 ui <- fluidPage(
@@ -70,7 +70,7 @@ ui <- fluidPage(
                  numericInput(inputId = "MSMS_y", label = "m/z weighting factor (y)", value = 0),
                  numericInput(inputId = "MSMS_z", label = "intensity weighting factor (z)", value = 1),
                  numericInput(inputId = "MSMS_t", label = "m/z tolerence for merging fragments (Da)", value = 0.005),
-                 numericInput(inputId = "MSMS_b", label = "relative intensity cutoff", value = 1),
+                 numericInput(inputId = "MSMS_b", label = "relative intensity cutoff", value = 0.01),
                  textInput(inputId = "MS2outputdir", label = "Directory to save MS2 pdfs:"),
                  #tableOutput(outputId = "userMS2data"),
                  actionButton(inputId = "processMS2", label = "Save MS2s to pdf")
