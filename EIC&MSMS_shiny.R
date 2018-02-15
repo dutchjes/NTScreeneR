@@ -9,7 +9,7 @@ library(enviPat)
 library(shiny)
 library(MSnbase)
 library(devtools)
-install_github("dutchjes/MSMSsim", auth_token = "81c07451a528aa56491628b81fc679d1cdb08649")
+install_github("dutchjes/MSMSsim", auth_token = "")
 library(MSMSsim)
 
 ui <- fluidPage(
