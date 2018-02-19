@@ -26,16 +26,10 @@ ui <- fluidPage(
       selectInput(inputId = "IDcol", label = "Column with ID", choices = c()),
       selectInput(inputId = "ioncol", label = "Column with ionization mode", choices = c()),
       selectInput(inputId = "ionization", label = "Which Ionization mode?", choices = c()),
-      
       numericInput(inputId = "masstol", label = "ppm tolerence", value = c(10)),
       numericInput(inputId = "rtwind", label = "rt window (sec)", value = c(60)), ## user selected
-      
       textInput(inputId = "filedir", label = "Directory with mzXML files:"), ## path to RAW files
-      
       textOutput(outputId = "status")
-      
-   
- #     checkboxInput(inputId = "MSMS2", label = "Display MS/MS scans?") ## user selected
     ),
     
     mainPanel(
@@ -62,29 +56,26 @@ ui <- fluidPage(
                  plotOutput(outputId = "MSMS")
                  ),
         
-        tabPanel("MS2 Output",
-                # fileInput(inputId = "MS2topull", label = "Upload file with precursor masses and data files"),
-                 selectInput(inputId = "MS2filecol", label = "Column with mzXMLs to extract MS2", choices = c()),
-                 selectInput(inputId = "reffilecol", label = "Column with mzXMLs to extract reference MS2", choices = c()),
-                 checkboxInput(inputId = "htot", label = "Plot head to tail between File and Reference"),
-                 numericInput(inputId = "MSMS_y", label = "m/z weighting factor (y)", value = 0),
-                 numericInput(inputId = "MSMS_z", label = "intensity weighting factor (z)", value = 1),
-                 numericInput(inputId = "MSMS_t", label = "m/z tolerence for merging fragments (Da)", value = 0.005),
-                 numericInput(inputId = "MSMS_b", label = "relative intensity cutoff", value = 0.01),
-                 textInput(inputId = "MS2outputdir", label = "Directory to save MS2 pdfs:"),
-                 #tableOutput(outputId = "userMS2data"),
-                 actionButton(inputId = "processMS2", label = "Save MS2s to pdf")
-                 #selectInput(inputId = "MS2feature", label = "feature to extract", choices = c()), ## filled with masses from P_data
-                 #plotOutput(outputId = "MS2plot"),
-                 #selectInput(inputId = "RAWFileMS2", label = "Current mzXML file:", choices = c(), multiple = FALSE) ##  filled with names in filedir
-                 ),
-        
-        tabPanel("Data Output", 
+        tabPanel("EIC Output", 
                  checkboxGroupInput(inputId = "RAWFileOutput", label = "Files to process:", choices = c(), inline = TRUE), ##  filled with names in filedir
                  actionButton("selectall", "Select All Files"),
                  #checkboxInput(inputId = "pdf", label = "Save images to pdf?"), 
                  textInput(inputId = "outputdir", label = "Directory to save pdf:"),
                  actionButton(inputId = "process", label = "Save to pdf")
+                 ),
+        
+        tabPanel("MS2 Output",
+                 selectInput(inputId = "MS2filecol", label = "Column with mzXMLs to extract MS2", choices = c()),
+                 selectInput(inputId = "reffilecol", label = "Column with mzXMLs to extract reference MS2", choices = c()),
+                 checkboxInput(inputId = "htot", label = "Plot head to tail between File and Reference"),
+                 radioButtons(inputId = "whichMSMS", label = "Which MS2 scans to plot", choices = c("only most intense precursor in selected RT range",
+                                                                                                    "all MS2 scans in selected RT range")),
+                 numericInput(inputId = "MSMS_y", label = "m/z weighting factor (y)", value = 0),
+                 numericInput(inputId = "MSMS_z", label = "intensity weighting factor (z)", value = 1),
+                 numericInput(inputId = "MSMS_t", label = "m/z tolerence for merging fragments (Da)", value = 0.005),
+                 numericInput(inputId = "MSMS_b", label = "relative intensity cutoff", value = 0.01),
+                 textInput(inputId = "MS2outputdir", label = "Directory to save MS2 pdfs:"),
+                 actionButton(inputId = "processMS2", label = "Save MS2s to pdf")
                  )
       )
     )
@@ -142,36 +133,37 @@ server <- function(input, output, session){
                        features = c(),
                        filepath = c(),
                        filename = c(),
-                       ftic = c(),
-                       hdtic = c(),
-                       feic.ms1 = c(),
-                       hdeic.ms1 = c(),
-                       feic.ms2 = c(),
-                       hdeic.ms2 = c(),
-                       rfeic.ms1 = c(),
-                       rhdeic.ms1 = c(),
-                       rfeic.ms2 = c(),
-                       rhdeic.ms2 = c(),
+                       f = c(),
+                       r = c(),
                        allcalc = c(),
-                      # mzmin = c(),
-                      # mzmax = c(),
                        msms = list(),
                        ms2.data = c(),
                        ms2.files = c(),
                        ref.files = c(),
-                       spec.file = c(),
-                       spec.ref = c())
+                       spec.file = list(),
+                       spec.ref = list())
   
   
   observeEvent(input$P_data,{
     rv$col <- colnames(P_data())
     
-    updateSelectInput(session, "masscol", choices = rv$col)
-    updateSelectInput(session, "rtcol", choices = rv$col)
-    updateSelectInput(session, "IDcol", choices = rv$col)
-    updateSelectInput(session, "ioncol", choices = rv$col)
-    updateSelectInput(session, "MS2filecol", choices = rv$col)
-    updateSelectInput(session, "reffilecol", choices = rv$col)
+    guess.mass <- c(which(grepl("Mass", colnames(P_data()))), which(grepl("mz", colnames(P_data()))))
+    updateSelectInput(session, "masscol", choices = rv$col, selected = rv$col[guess.mass[1]])
+    
+    guess.rt <- c(which(grepl("RT", colnames(P_data()))), which(grepl("retention", colnames(P_data()))))
+    updateSelectInput(session, "rtcol", choices = rv$col, selected = rv$col[guess.rt[1]])
+    
+    guess.name <- c(which(grepl("ID", colnames(P_data()))), which(grepl("name", colnames(P_data()))))
+    updateSelectInput(session, "IDcol", choices = rv$col, selected = rv$col[guess.name])
+    
+    guess.mode <- c(which(grepl("Polarity", colnames(P_data()))), which(grepl("ESI", colnames(P_data()))))
+    updateSelectInput(session, "ioncol", choices = rv$col, selected = rv$col[guess.mode])
+    
+    guess.file <- c(which(grepl("Sample", colnames(P_data()))), which(grepl("File", colnames(P_data()))))
+    updateSelectInput(session, "MS2filecol", choices = rv$col, selected = rv$col[guess.file])
+    
+    guess.ref <- c(which(grepl("Reference", colnames(P_data()))), which(grepl("ref", colnames(P_data()))))
+    updateSelectInput(session, "reffilecol", choices = rv$col, selected = rv$col[guess.ref])
     
   })
  
@@ -183,12 +175,10 @@ server <- function(input, output, session){
   
   
   observeEvent(c(input$masscol, input$rtcol, input$IDcol, input$ioncol, input$rtunit), {
-    
 
     tuke <- which(colnames(P_data()) == input$ioncol)
     rv$ESImodes <- unique(P_data()[,tuke])
     updateSelectInput(session, "ionization", choices = rv$ESImodes)
-    
 
     take <- which(colnames(P_data()) == input$masscol)
     rv$masses <- as.numeric(as.character(P_data()[,take]))
@@ -203,13 +193,11 @@ server <- function(input, output, session){
       rv$rts_sec <- as.numeric(as.character(P_data()[,tike])) * 60
     }
     
-
     rv$features <- paste(rv$masses, rv$rts_min, sep = "_")
     updateSelectInput(session, "feature", choices = rv$features)
 
     toke <- which(colnames(P_data()) == input$IDcol)
     rv$names <- P_data()[,toke]
-    
     
     # tuke <- which(colnames(P_data()) == input$ioncol)
     # rv$ESImodes <- unique(P_data()[,tuke])
@@ -266,7 +254,6 @@ server <- function(input, output, session){
           #  plot(MSmap(rv$ftic, lowMz = min(rv$masses), highMz = max(rv$masses), resMz = ppm(max(rv$masses), input$masstol, p = TRUE)), aspect = 1, allTicks = FALSE)
         })
       }
-
   });
   
   ##########################
@@ -364,9 +351,7 @@ server <- function(input, output, session){
     }else{
       updateCheckboxGroupInput(session, "RAWFileOutput", choices = rv$filename, selected = rv$filename)
       rv$allcalc <- input$RAWFileOutput
-
     }
-
   })
 
 
@@ -542,7 +527,6 @@ server <- function(input, output, session){
   ### add compound name to plot
   
   observeEvent(input$process,{
-
 
     for(i in 1:length(rv$allcalc)){
 
