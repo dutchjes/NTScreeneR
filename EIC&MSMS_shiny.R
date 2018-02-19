@@ -312,17 +312,15 @@ server <- function(input, output, session){
       rv$f <- readmzXML(rv$filepath[process.file2], mode = "onDisk")
 
     if(input$useRT == TRUE){
-
-      rtlims <- rtbounds(rv$rts_sec[process.feature], input$rtwind)
-      eic <- chromatogram(rv$f[[1]][[1]], rt = rtlims, mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
-      rv$ms2.data <- findMS2(rv$f[[1]][[2]], rv$f[[2]][[2]], rv$masses[process.feature], input$masstol) 
-      rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
+      rt.lims <- rtbounds(rv$rts_sec[process.feature], input$rtwind)
     }else{
       rt.lims <- c(min(rtime(rv$f[[1]][[1]])),max(rtime(rv$f[[1]][[1]])))
+    }
+      
       eic <- chromatogram(rv$f[[1]][[1]], rt = rt.lims, mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
       rv$ms2.data <- findMS2(rv$f[[1]][[2]], rv$f[[2]][[2]], rv$masses[process.feature], input$masstol) 
-    }
-
+      rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rt.lims[1] & rv$ms2.data[,2] < rt.lims[2])
+      
     output$EIC <- renderPlot({myXIC(eic = eic, ms2.data = rv$ms2.data, exp.rt = rv$rts_sec[process.feature])})
     
     if(nrow(rv$ms2.data) > 0){
@@ -385,11 +383,15 @@ server <- function(input, output, session){
         
         output$status <- renderText({paste("Working with file", rv$ms2.files[i], sep = " ")})
         rv$f <- readmzXML(file.path = rv$filepath[process.file], mode = "onDisk")
-        rt.lims <- c(min(rtime(rv$f[[1]][[1]])),max(rtime(rv$f[[1]][[1]])))
-        eic <- chromatogram(rv$f[[1]][[1]], rt = rt.lims, mz = ppm(rv$masses[i], input$masstol, l = TRUE))
+        
+        if(input$useRT == TRUE){
+          rt.lims <- rtbounds(rv$rts_sec[process.feature], input$rtwind)
+        }else{
+          rt.lims <- c(min(rtime(rv$f[[1]][[1]])),max(rtime(rv$f[[1]][[1]])))
+        }
+        
         rv$ms2.data <- findMS2(rv$f[[1]][[2]], rv$f[[2]][[2]], rv$masses[i], input$masstol)
-        rtlims <- rtbounds(rv$rts_sec[i], input$rtwind)
-        rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
+        rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rt.lims[1] & rv$ms2.data[,2] < rt.lims[2])
         
         if(is.null(rv$ms2.data)==TRUE)
           rv$spec.file <- NA
@@ -430,9 +432,15 @@ server <- function(input, output, session){
         
         output$status <- renderText({paste("Working with file", rv$ref.files[i], sep = " ")})
         rv$r <- readmzXML(file.path = rv$filepath[ref.file], mode = "onDisk")
+        
+        if(input$useRT == TRUE){
+          rt.lims <- rtbounds(rv$rts_sec[process.feature], input$rtwind)
+        }else{
+          rt.lims <- c(min(rtime(rv$r[[1]][[1]])),max(rtime(rv$r[[1]][[1]])))
+        }
+        
         rv$ms2.data <- findMS2(rv$r[[1]][[2]], rv$r[[2]][[2]], rv$masses[i], input$masstol)
-        rtlims <- rtbounds(rv$rts_sec[i], input$rtwind)
-        rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
+        rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rt.lims[1] & rv$ms2.data[,2] < rt.lims[2])
         
         if(is.null(rv$ms2.data)==TRUE)
           rv$spec.ref <- NA
@@ -519,14 +527,19 @@ server <- function(input, output, session){
         
         output$status <- renderText({paste("Working with file", rv$ms2.files[i], sep = " ")})
         rv$f <- readmzXML(rv$filepath[process.file], mode = "onDisk")
-        rt.lims <- c(min(rtime(rv$f[[1]][[1]])),max(rtime(rv$f[[1]][[1]])))
+        
+        if(input$useRT == TRUE){
+          rt.lims <- rtbounds(rv$rts_sec[process.feature], input$rtwind)
+        }else{
+          rt.lims <- c(min(rtime(rv$f[[1]][[1]])),max(rtime(rv$f[[1]][[1]])))
+        }
+        
         eic <- chromatogram(rv$f[[1]][[1]], rt = rt.lims, mz = ppm(rv$masses[i], input$masstol, l = TRUE))
         rv$ms2.data <- findMS2(rv$f[[1]][[2]], rv$f[[2]][[2]], rv$masses[i], input$masstol)
         if(is.null(rv$ms2.data)[1]==TRUE)
           next
         else{
-          rtlims <- rtbounds(rv$rts_sec[i], input$rtwind)
-          rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
+          rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rt.lims[1] & rv$ms2.data[,2] < rt.lims[2])
           
           if(input$whichMSMS == "only most intense precursor in selected RT range"){
             
