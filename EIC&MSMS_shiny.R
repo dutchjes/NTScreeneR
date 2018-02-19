@@ -8,8 +8,9 @@ library(Hmisc)
 library(enviPat)
 library(shiny)
 library(MSnbase)
+library(ggplot2)
 library(devtools)
-install_github("dutchjes/MSMSsim")
+#install_github("dutchjes/MSMSsim")
 library(MSMSsim)
 
 ui <- fluidPage(
@@ -104,14 +105,12 @@ server <- function(input, output, session){
     return(c(rtmin, rtmax))
   }
   
-  findMS2 <- function(hd.ms1, hd.ms2, eic, precursor.mz, mztol){
+  findMS2 <- function(hd.ms1, hd.ms2, precursor.mz, mztol){
     
     mzlimits <- ppm(precursor.mz, mztol, l = TRUE)
     ms2.scans <- which(hd.ms2$precursorMZ < mzlimits[1] & hd.ms2$precursorMZ > mzlimits[2])
-    if(length(ms2.scans)==0){return(NA)}
-    ms1.scans <- sapply(ms2.scans, function(x) which.min(abs(hd.ms1$acquisitionNum - hd.ms2$acquisitionNum[x])))
-    
-   # eic.int <- as.numeric(as.character(eic@.Data[[1]]@intensity[ms1.scans]))
+    if(length(ms2.scans)==0){return(NULL)}
+
     eic.int <- as.numeric(as.character(hd.ms2$precursorIntensity[ms2.scans]))
     ms2.rt <- as.numeric(as.character(hd.ms2$retentionTime[ms2.scans]))
     scan.nm <- hd.ms2$acquisitionNum[ms2.scans]
@@ -119,6 +118,48 @@ server <- function(input, output, session){
     
   }
   
+  readmzXML <- function(file.path, mode){
+    
+    ms1 <- readMSData(file.path, centroided. = TRUE, msLevel. = 1, mode = mode)
+    h.ms1 <- header(ms1)
+    
+    ms2 <- readMSData(file.path, centroided. = TRUE, msLevel. = 2, mode = mode)
+    h.ms2 <- header(ms2)
+    
+    return(list(list(ms1, h.ms1), list(ms2, h.ms2)))
+    
+  }
+  
+  myXIC <- function(eic, ms2.data, exp.rt){
+    
+    plot(eic)
+    abline(v = exp.rt, col = "blue")
+    
+    if(nrow(ms2.data) < 1)
+      legend("topleft", legend = paste("No MS2 scans"))
+    else
+      points(ms2.data[,2:3], col = "red", pch = 16)
+  }
+  
+  myHeadtoTail <- function(sample.spectrum, ref.spectrum, y, z, t, b, id.file, id.ref){
+    
+    my.spectra <- OrgMSSim(as.data.frame(sample.spectrum), as.data.frame(ref.spectrum), y = y, z = z, t = t, b = b)
+    match <- subset(my.spectra[[2]], my.spectra[[2]]$match > 0)
+    plot.new()
+    plot.window(xlim = c(0,max(my.spectra[[2]]$mz)+50), ylim = c(-1,1))
+    points(x = my.spectra[[2]]$mz, y = (my.spectra[[2]][,4])/max(my.spectra[[2]][,4]), type = "h", col = "grey")
+    points(x = my.spectra[[2]]$mz, y = -(my.spectra[[2]][,5])/max(my.spectra[[2]][,5]), type = "h", col = "grey")
+    points(x = match$mz, y = (match[,4])/max(my.spectra[[2]][,4]), type = "h", col = "red")
+    points(x = match$mz, y = -(match[,5])/max(my.spectra[[2]][,5]), type = "h", col = "blue")
+    abline(h = 0)
+    abline(h = input$MSMS_b, lty = 2, col = "grey")
+    abline(h = -input$MSMS_b, lty = 2, col = "grey")
+    axis(side = 1)
+    axis(side = 2)
+    title(main = c(id.file, "\n", id.ref), sub = paste("similarity score = ", round(my.spectra$score, 3), sep = ""),
+          xlab = "Fragment m/z", ylab = "Relative intensity")
+    box()
+  }
   
   output$userP_data <- renderTable({
     P_data()
@@ -223,19 +264,16 @@ server <- function(input, output, session){
 
       process.file1 <- which(rv$filename == input$RAWFileTIC)
       
-      #browser()
-      
       if(length(process.file1) == 0){output$status <- renderText({"Waiting for mzXML files..."})}
       
       else{
         
         output$status <- renderText({"Plotting TIC"})
-        rv$ftic <- try(readMSData(rv$filepath[process.file1], mode = "onDisk"))
-        rv$htic <- tryCatch(header(rv$ftic))
-        
+        rv$f <- try(readmzXML(rv$filepath[process.file1], mode = "onDisk"))
+
         output$status <- renderText({"Read in file"})
         output$TIC <- renderPlot({
-          plot(chromatogram(rv$ftic))
+          plot(chromatogram(rv$f[[1]][[1]]))
         })
         
         output$status <- renderText({"Finished"})
@@ -271,72 +309,35 @@ server <- function(input, output, session){
     if(length(process.file2) == 1){
       
       output$status <- renderText({"Ready to plot EIC..."})
-    
-    rv$feic.ms1 <- readMSData(rv$filepath[process.file2], centroided. = TRUE, msLevel. = 1, mode = "onDisk")
-    rv$hdeic.ms1 <- header(rv$feic.ms1)
-
-    rv$feic.ms2 <- readMSData(rv$filepath[process.file2], centroided. = TRUE, msLevel. = 2, mode = "onDisk")
-    rv$hdeic.ms2 <- header(rv$feic.ms2)
-
-    output$EIC <- renderPlot({
+      rv$f <- readmzXML(rv$filepath[process.file2], mode = "onDisk")
 
     if(input$useRT == TRUE){
 
-     ## first the whole eic to get the correct ms2 acquisitionScans 
-      eic <- chromatogram(rv$feic.ms1, rt = c(min(rtime(rv$feic.ms1)),max(rtime(rv$feic.ms1))), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
-      rv$ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[process.feature], input$masstol) 
-
-     ## now the shortened eic to plot 
-      eic <- chromatogram(rv$feic.ms1, rt = rtbounds(rv$rts_sec[process.feature], input$rtwind), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
-      plot(eic)
-      abline(v = rv$rts_sec[process.feature], col = "blue")
-
-      if(is.na(rv$ms2.data)[1] == TRUE)
-        legend("topleft", legend = paste("No MS2 scans"))
-      else
-        points(rv$ms2.data[,2:3], col = "red", pch = 16)
-      
       rtlims <- rtbounds(rv$rts_sec[process.feature], input$rtwind)
+      eic <- chromatogram(rv$f[[1]][[1]], rt = rtlims, mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
+      rv$ms2.data <- findMS2(rv$f[[1]][[2]], rv$f[[2]][[2]], rv$masses[process.feature], input$masstol) 
       rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
-
-
     }else{
-      
-      eic <- chromatogram(rv$feic.ms1, rt = c(min(rtime(rv$feic.ms1)),max(rtime(rv$feic.ms1))), mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
-      rv$ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[process.feature], input$masstol) ### problem with plotting ms2 scans comes from shortened eic
-      
-      plot(eic)
-      abline(v = rv$rts_sec[process.feature], col = "blue")
-
-      if(is.na(rv$ms2.data)[1] == TRUE)
-        legend("topleft", legend = paste("No MS2 scans"))
-      else
-        points(rv$ms2.data[,2:3], col = "red", pch = 16)
-
+      rt.lims <- c(min(rtime(rv$f[[1]][[1]])),max(rtime(rv$f[[1]][[1]])))
+      eic <- chromatogram(rv$f[[1]][[1]], rt = rt.lims, mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
+      rv$ms2.data <- findMS2(rv$f[[1]][[2]], rv$f[[2]][[2]], rv$masses[process.feature], input$masstol) 
     }
 
-    })
+    output$EIC <- renderPlot({myXIC(eic = eic, ms2.data = rv$ms2.data, exp.rt = rv$rts_sec[process.feature])})
     
-    
-    updateSelectInput(session, "selectedMSMS", choices = rv$ms2.data[,1])
-    output$availMSMSscans <- renderTable({
-      rv$ms2.data
-    })
-    
+    if(nrow(rv$ms2.data) > 0){
+      updateSelectInput(session, "selectedMSMS", choices = rv$ms2.data[,1])
+      output$availMSMSscans <- renderTable({rv$ms2.data})
+      observeEvent(input$selectedMSMS, 
+                   output$MSMS <- renderPlot({
+                     plot(rv$f[[2]][[1]][[which(rv$f[[2]][[2]]$acquisitionNum == input$selectedMSMS)]], reporters = NULL, full = TRUE) + theme_bw()
+                   })
+      )
+    }
     output$Compound <- renderText({paste(rv$names[process.feature])})
     output$status <- renderText({"Finished"})
-        
     }
-    
-    observeEvent(input$selectedMSMS, 
-                 output$MSMS <- renderPlot({
-                   plot(rv$feic.ms2[[which(rv$hdeic.ms2$acquisitionNum == input$selectedMSMS)]], reporters = NULL, full = TRUE) + theme_bw()
-
-    })
-    )
-    
   })
-
 
 
   observeEvent(c(input$RAWFileOutput,input$selectall), {
@@ -377,101 +378,128 @@ server <- function(input, output, session){
       for(i in 1:length(rv$ms2.files)){
         
         ### sample file
-        process.file <- which(grepl(paste(rv$ms2.files[i]), rv$filename) > 0)
+        if(grepl(".mzXML", rv$ms2.files[i]))
+          process.file <- which(grepl(paste(rv$ms2.files[i]), rv$filename) > 0)
+        else
+          process.file <- which(paste(rv$ms2.files[i], ".mzXML", sep = "", rv$filename))
+        
         output$status <- renderText({paste("Working with file", rv$ms2.files[i], sep = " ")})
+        rv$f <- readmzXML(file.path = rv$filepath[process.file], mode = "onDisk")
+        rt.lims <- c(min(rtime(rv$f[[1]][[1]])),max(rtime(rv$f[[1]][[1]])))
+        eic <- chromatogram(rv$f[[1]][[1]], rt = rt.lims, mz = ppm(rv$masses[i], input$masstol, l = TRUE))
+        rv$ms2.data <- findMS2(rv$f[[1]][[2]], rv$f[[2]][[2]], rv$masses[i], input$masstol)
+        rtlims <- rtbounds(rv$rts_sec[i], input$rtwind)
+        rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
         
-        rv$feic.ms1 <- readMSData(rv$filepath[process.file], centroided. = TRUE, msLevel. = 1, mode = "onDisk")
-        rv$hdeic.ms1 <- header(rv$feic.ms1)
-        
-        rv$feic.ms2 <- readMSData(rv$filepath[process.file], centroided. = TRUE, msLevel. = 2, mode = "onDisk")
-        rv$hdeic.ms2 <- header(rv$feic.ms2)
-        
-        ## first the whole eic to get the correct ms2 acquisitionScans
-        eic <- chromatogram(rv$feic.ms1, rt = c(min(rtime(rv$feic.ms1)),max(rtime(rv$feic.ms1))), mz = ppm(rv$masses[i], input$masstol, l = TRUE))
-        #plot(eic)
-        rv$ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[i], input$masstol)
-        if(is.na(rv$ms2.data)[1]==TRUE)
+        if(is.null(rv$ms2.data)==TRUE)
           rv$spec.file <- NA
         else{
           
-          rtlims <- rtbounds(rv$rts_sec[i], input$rtwind)
-          rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
-          get.scan <- which.max(rv$ms2.data[,3])
-          if(length(get.scan)<1)
-            rv$spec.file <- NA
-          else
-            rv$spec.file <- rv$feic.ms2[[which(rv$hdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]]
-           ce <- rv$hdeic.ms2$collisionEnergy[which(rv$hdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]
-           id.file <- paste(rv$features[i], "_NCE", ce, "_", formatC(max(as.data.frame(rv$spec.file)$i), format = "e", 1), "_", rv$ms2.files[i], sep = "")
-          
-          
+          ## input for intense or all MS2
+          if(input$whichMSMS == "only most intense precursor in selected RT range"){
+            get.scan <- which.max(rv$ms2.data[,3])
+            
+            if(length(get.scan)<1)
+              rv$spec.file <- NA
+            else
+            rv$spec.file <- rv$f[[2]][[1]][[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][get.scan])]]
+            ce <- rv$f[[2]][[2]]$collisionEnergy[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][get.scan])]
+            id.file <- paste(rv$features[i], "_NCE", ce, "_", formatC(max(as.data.frame(rv$spec.file)$i), format = "e", 1), "_", rv$ms2.files[i], sep = "")
+          }
+ 
+          if(input$whichMSMS=="all MS2 scans in selected RT range"){
+
+              ce <- c()
+              id.file <- c()
+              
+              for(k in 1:nrow(rv$ms2.data)){
+                
+                rv$spec.file[[k]] <- rv$f[[2]][[1]][[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]]
+                ce <- rv$f[[2]][[2]]$collisionEnergy[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]
+                id.file[k] <- paste(rv$features[i], "_NCE", ce, "_", formatC(max(as.data.frame(rv$spec.file[[k]])$i), format = "e", 1), "_", rv$ms2.files[i], sep = "")
+              }
+          }
         }
         
-        
         ### reference file
-        ref.file <- which(grepl(paste(rv$ref.files[i]), rv$filename) > 0)
+        if(grepl(".mzXML", rv$ref.files[i]))
+          ref.file <- which(grepl(paste(rv$ref.files[i]), rv$filename) > 0)
+        else
+          ref.file <- which(paste(rv$ref.files[i], ".mzXML", sep = "", rv$filename))
+        
         output$status <- renderText({paste("Working with file", rv$ref.files[i], sep = " ")})
+        rv$r <- readmzXML(file.path = rv$filepath[ref.file], mode = "onDisk")
+        rv$ms2.data <- findMS2(rv$r[[1]][[2]], rv$r[[2]][[2]], rv$masses[i], input$masstol)
+        rtlims <- rtbounds(rv$rts_sec[i], input$rtwind)
+        rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
         
-        rv$rfeic.ms1 <- readMSData(rv$filepath[ref.file], centroided. = TRUE, msLevel. = 1, mode = "onDisk")
-        rv$rhdeic.ms1 <- header(rv$rfeic.ms1)
-        
-        rv$rfeic.ms2 <- readMSData(rv$filepath[ref.file], centroided. = TRUE, msLevel. = 2, mode = "onDisk")
-        rv$rhdeic.ms2 <- header(rv$rfeic.ms2)
-        
-        ## first the whole eic to get the correct ms2 acquisitionScans
-        eic <- chromatogram(rv$rfeic.ms1, rt = c(min(rtime(rv$rfeic.ms1)),max(rtime(rv$rfeic.ms1))), mz = ppm(rv$masses[i], input$masstol, l = TRUE))
-        #plot(eic)
-        rv$ms2.data <- findMS2(rv$rhdeic.ms1, rv$rhdeic.ms2, eic, rv$masses[i], input$masstol)
-        if(is.na(rv$ms2.data)[1]==TRUE)
+        if(is.null(rv$ms2.data)==TRUE)
           rv$spec.ref <- NA
         else{
           
-          rtlims <- rtbounds(rv$rts_sec[i], input$rtwind)
-          rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
-          get.scan <- which.max(rv$ms2.data[,3])
-          if(length(get.scan)<1)
-            rv$spec.ref <- NA
-          else
-            rv$spec.ref <- rv$rfeic.ms2[[which(rv$rhdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]]
-          ce <- rv$rhdeic.ms2$collisionEnergy[which(rv$rhdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]
-          id.ref <- paste(rv$features[i], "_NCE", ce, "_", formatC(max(as.data.frame(rv$spec.ref)$i), format = "e", 1), "_", rv$ref.files[i], sep = "")
+          ## input for intense or all MS2
+          if(input$whichMSMS == "only most intense precursor in selected RT range"){
+            get.scan <- which.max(rv$ms2.data[,3])
           
+            if(length(get.scan)<1)
+             rv$spec.ref <- NA
+            else
+             rv$spec.ref <- rv$r[[2]][[1]][[which(rv$r[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][get.scan])]]
+            
+          ce <- rv$r[[2]][[2]]$collisionEnergy[which(rv$r[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][get.scan])]
+          id.ref <- paste(rv$features[i], "_NCE", ce, "_", formatC(max(as.data.frame(rv$spec.ref)$i), format = "e", 1), "_", rv$ref.files[i], sep = "")
+          }
+          
+          if(input$whichMSMS=="all MS2 scans in selected RT range"){
+            ce <- c()
+            id.ref <- c()
+            
+            for(k in 1:nrow(rv$ms2.data)){
+              
+              rv$spec.ref[[k]] <- rv$r[[2]][[1]][[which(rv$r[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]]
+              ce <- rv$r[[2]][[2]]$collisionEnergy[which(rv$r[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]
+              id.ref[k] <- paste(rv$features[i], "_NCE", ce, "_", formatC(max(as.data.frame(rv$spec.ref[[k]])$i), format = "e", 1), "_", rv$ref.files[i], sep = "")
+            }
+          }
         }
         
-        if(!is.na(rv$spec.file) & !is.na(rv$spec.ref)){
-          #plot(rv$spec.file, rv$spec.ref, main = c(id.file, "/n", id.ref),
-          #     sub = paste("dot product = ", round(compareSpectra(rv$spec.file, rv$spec.ref, fun = "dotproduct"),3), sep = ""))
+        if(!sum(!is.na(rv$spec.file) & !is.na(rv$spec.ref))==0){
+          if(input$whichMSMS == "only most intense precursor in selected RT range"){
+            
+            myHeadtoTail(sample.spectrum = as.data.frame(rv$spec.file), ref.spectrum = as.data.frame(rv$spec.ref),
+                         y = input$MSMS_y, z = input$MSMS_z, t = input$MSMS_t, b = input$MSMS_b, id.file = id.file, id.ref = id.ref)
+            
+            sink(paste(input$MS2outputdir,"\\", id.file, ".txt", sep = ""))
+            print(rv$spec.file)
+            print(as.data.frame(rv$spec.file))
+            print(rv$spec.ref)
+            print(as.data.frame(rv$spec.ref))
+            sink()
+          }
           
-          my.spectra <- OrgMSSim(as.data.frame(rv$spec.file), as.data.frame(rv$spec.ref), y = input$MSMS_y, z = input$MSMS_z, t = input$MSMS_t, b = input$MSMS_b)
-          match <- subset(my.spectra[[2]], my.spectra[[2]]$match > 0)
-          plot.new()
-          plot.window(xlim = c(0,max(my.spectra[[2]]$mz)+50), ylim = c(-1,1))
-          points(x = my.spectra[[2]]$mz, y = (my.spectra[[2]][,4])/max(my.spectra[[2]][,4]), type = "h", col = "grey")
-          points(x = my.spectra[[2]]$mz, y = -(my.spectra[[2]][,5])/max(my.spectra[[2]][,5]), type = "h", col = "grey")
-          points(x = match$mz, y = (match[,4])/max(my.spectra[[2]][,4]), type = "h", col = "red")
-          points(x = match$mz, y = -(match[,5])/max(my.spectra[[2]][,5]), type = "h", col = "blue")
-          #points(x = match$mz, y = rep(0, nrow(match)), pch = 16, col = "black", cex = 0.8)
-          abline(h = 0)
-          abline(h = input$MSMS_b/100, lty = 2, col = "grey")
-          abline(h = -input$MSMS_b/100, lty = 2, col = "grey")
-          axis(side = 1)
-          axis(side = 2)
-          title(main = c(id.file, "\n", id.ref), sub = paste("similarity score = ", round(my.spectra$score, 3), sep = ""),
-                xlab = "Fragment m/z", ylab = "Relative intensity")
-          box()
-          
-          #browser()
-          
-          sink(paste(input$MS2outputdir,"\\", id.file, ".txt", sep = ""))
-          print(rv$spec.file)
-          print(as.data.frame(rv$spec.file))
-          print(rv$spec.ref)
-          print(as.data.frame(rv$spec.ref))
-          sink()
+          if(input$whichMSMS == "all MS2 scans in selected RT range"){
+            
+            sink(paste(input$MS2outputdir,"\\AllMS2scans.txt", sep = ""))
+            
+            for(k in 1:length(rv$spec.file)){
+              
+              for(l in 1:length(rv$spec.ref)){
+                
+                myHeadtoTail(sample.spectrum = as.data.frame(rv$spec.file[[k]]), ref.spectrum = as.data.frame(rv$spec.ref[[l]]),
+                             y = input$MSMS_y, z = input$MSMS_z, t = input$MSMS_t, b = input$MSMS_b, 
+                             id.file = id.file[k], id.ref = id.ref[l])
+                
+                print(rv$spec.file[[k]])
+                print(as.data.frame(rv$spec.file[[k]]))
+                print(rv$spec.ref[[l]])
+                print(as.data.frame(rv$spec.ref[[l]]))
+              }
+            }
+            sink()
+          }
         }
         else
           next
-        
       }
       
       output$status <- renderText({"Finished building MS2 pdfs"})
@@ -483,43 +511,46 @@ server <- function(input, output, session){
       
       for(i in 1:length(rv$ms2.files)){
         
-        process.file <- which(grepl(paste(rv$ms2.files[i]), rv$filename) > 0)
+        if(grepl(".mzXML", rv$ref.files[i]))
+          process.file <- which(grepl(paste(rv$ms2.files[i]), rv$filename) > 0)
+        else
+          process.file <- which(paste(rv$ms2.files[i], ".mzXML", sep = "", rv$filename))
+        
         output$status <- renderText({paste("Working with file", rv$ms2.files[i], sep = " ")})
-        
-        rv$feic.ms1 <- readMSData(rv$filepath[process.file], centroided. = TRUE, msLevel. = 1, mode = "onDisk")
-        rv$hdeic.ms1 <- header(rv$feic.ms1)
-        
-        rv$feic.ms2 <- readMSData(rv$filepath[process.file], centroided. = TRUE, msLevel. = 2, mode = "onDisk")
-        rv$hdeic.ms2 <- header(rv$feic.ms2)
-        
-        ## first the whole eic to get the correct ms2 acquisitionScans
-        eic <- chromatogram(rv$feic.ms1, rt = c(min(rtime(rv$feic.ms1)),max(rtime(rv$feic.ms1))), mz = ppm(rv$masses[i], input$masstol, l = TRUE))
-        plot(eic)
-        rv$ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[i], input$masstol)
-        if(is.na(rv$ms2.data)[1]==TRUE)
+        rv$f <- readmzXML(rv$filepath[process.file], mode = "onDisk")
+        rt.lims <- c(min(rtime(rv$f[[1]][[1]])),max(rtime(rv$f[[1]][[1]])))
+        eic <- chromatogram(rv$f[[1]][[1]], rt = rt.lims, mz = ppm(rv$masses[i], input$masstol, l = TRUE))
+        rv$ms2.data <- findMS2(rv$f[[1]][[2]], rv$f[[2]][[2]], rv$masses[i], input$masstol)
+        if(is.null(rv$ms2.data)[1]==TRUE)
           next
         else{
-          
           rtlims <- rtbounds(rv$rts_sec[i], input$rtwind)
           rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
+          
+          if(input$whichMSMS == "only most intense precursor in selected RT range"){
+            
           get.scan <- which.max(rv$ms2.data[,3])
           if(length(get.scan)<1)
             next
           else
-            plot(rv$feic.ms2[[which(rv$hdeic.ms2$acquisitionNum == rv$ms2.data[,1][get.scan])]], reporters = NULL, full = TRUE) + theme_bw()
+            plot(rv$f[[2]][[1]][[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][get.scan])]], reporters = NULL, full = TRUE) + theme_bw()
+          }
           
+          if(input$whichMSMS == "all MS2 scans in selected RT range"){
+              ce <- c()
+              id.ref <- c()
+              
+              for(k in 1:nrow(rv$ms2.data)){
+                plot(rv$f[[2]][[1]][[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]], reporters = NULL, full = TRUE) + theme_bw()
+              }
+            }
+          }
         }
-        
       };
       
       dev.off()
       output$status <- renderText({"Finished building MS2 pdfs"})
-      
-    }
-    
-      
   })
-
   
   
   ##################################
@@ -535,61 +566,30 @@ server <- function(input, output, session){
       output$status <- renderText({paste("Working on file ", rv$allcalc[i], sep = "")})
 
       pdf(file = paste(input$outputdir, "\\", rv$filename[calcfile], "_PlottedEICs.pdf", sep = ""))
-
-      ms1 <- readMSData(rv$filepath[calcfile], centroided. = TRUE, msLevel. = 1, mode = "onDisk")
-      ms1.hd <- header(ms1)
-      
-      ms2 <- readMSData(rv$filepath[calcfile], centroided. = TRUE, msLevel. = 2, mode = "onDisk")
-      ms2.hd <- header(ms2)
+      plotting.file <- readmzXML(rv$filepath[calcfile], mode = "onDisk")
       
       sapply(rv$masses, function(x){
 
-        if(input$useRT == TRUE){
-
-          index <- which(rv$masses == x)
-          
-          ## plot eic over total runtime to get correct ms2 aquisition numbers
-          eic <- chromatogram(ms1, rt = c(min(rtime(ms1)),max(rtime(ms1))), mz = ppm(rv$masses[index], input$masstol, l = TRUE))
-          ms2.data <- findMS2(ms1.hd, ms2.hd, eic, rv$masses[index], input$masstol)
-          
-          ## get shortened eic for plotting
-          eic <- chromatogram(ms1, rt = rtbounds(rv$rts_sec[index], input$rtwind), mz = ppm(rv$masses[index], input$masstol, l = TRUE))
-          plot(eic)
-          abline(v = rv$rts_sec[index], col = "blue")
-        #  ms2.data <- findMS2(rv$hdeic.ms1, rv$hdeic.ms2, eic, rv$masses[index], input$masstol)
-          if(is.na(ms2.data))
-            legend("topleft", legend = paste("No MS2 scans"))
-          else
-            points(ms2.data, col = "red", pch = 16)
-
-        }else{
-
-         index <- which(rv$masses == x)
+        index <- which(rv$masses == x)
         
-          eic <- chromatogram(ms1, rt = c(min(rtime(ms1)),max(rtime(ms1))), mz = ppm(rv$masses[index], input$masstol, l = TRUE))
-          ms2.data <- findMS2(ms1.hd, ms2.hd, eic, rv$masses[index], input$masstol)
-
-          plot(eic)
-          abline(v = rv$rts_sec[index], col = "blue")
-          if(is.na(ms2.data))
-            legend("topleft", legend = paste("No MS2 scans"))
-          else
-            points(ms2.data, col = "red", pch = 16)
+        if(input$useRT == TRUE)
+          rt.lims <- rtbounds(rv$rts_sec[index], input$rtwind)
+        else
+          rt.lims <- c(min(rtime(plotting.file[[1]][[1]])),max(rtime(plotting.file[[1]][[1]])))
           
-        }
+         eic <- chromatogram(ms1, rt = rt.lims, mz = ppm(rv$masses[index], input$masstol, l = TRUE))
+         ms2.data <- findMS2(plotting.file[[1]][[2]], plotting.file[[2]][[2]], rv$masses[index], input$masstol)
+         myXIC(eic = eic, ms2.data = ms2.data, exp.rt = rv$rts_sec[index])
+      
       }
     )
-
       dev.off()
 
       if(i == length(rv$allcalc)){
-
         output$status <- renderText({paste("Finished building pdfs")})
       }
     }
-
-    })
-
+  })
 }
 
 shinyApp(ui = ui, server = server)
