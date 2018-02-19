@@ -402,7 +402,8 @@ server <- function(input, output, session){
             if(length(get.scan)<1)
               rv$spec.file <- NA
             else
-            rv$spec.file <- rv$f[[2]][[1]][[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][get.scan])]]
+              rv$spec.file <- rv$f[[2]][[1]][[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][get.scan])]]
+            
             ce <- rv$f[[2]][[2]]$collisionEnergy[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][get.scan])]
             id.file <- paste(rv$features[i], "_NCE", ce, "_", formatC(max(as.data.frame(rv$spec.file)$i), format = "e", 1), "_", rv$ms2.files[i], sep = "")
           }
@@ -415,8 +416,8 @@ server <- function(input, output, session){
               for(k in 1:nrow(rv$ms2.data)){
                 
                 rv$spec.file[[k]] <- rv$f[[2]][[1]][[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]]
-                ce <- rv$f[[2]][[2]]$collisionEnergy[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]
-                id.file[k] <- paste(rv$features[i], "_NCE", ce, "_", formatC(max(as.data.frame(rv$spec.file[[k]])$i), format = "e", 1), "_", rv$ms2.files[i], sep = "")
+                ce[k] <- rv$f[[2]][[2]]$collisionEnergy[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]
+                id.file[k] <- paste(rv$features[i], "_NCE", ce[k], "_", formatC(max(as.data.frame(rv$spec.file[[k]])$i), format = "e", 1), "_", rv$ms2.files[i], sep = "")
               }
           }
         }
@@ -457,8 +458,8 @@ server <- function(input, output, session){
             for(k in 1:nrow(rv$ms2.data)){
               
               rv$spec.ref[[k]] <- rv$r[[2]][[1]][[which(rv$r[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]]
-              ce <- rv$r[[2]][[2]]$collisionEnergy[which(rv$r[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]
-              id.ref[k] <- paste(rv$features[i], "_NCE", ce, "_", formatC(max(as.data.frame(rv$spec.ref[[k]])$i), format = "e", 1), "_", rv$ref.files[i], sep = "")
+              ce[k] <- rv$r[[2]][[2]]$collisionEnergy[which(rv$r[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]
+              id.ref[k] <- paste(rv$features[i], "_NCE", ce[k], "_", formatC(max(as.data.frame(rv$spec.ref[[k]])$i), format = "e", 1), "_", rv$ref.files[i], sep = "")
             }
           }
         }
