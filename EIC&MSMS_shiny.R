@@ -195,16 +195,16 @@ server <- function(input, output, session){
     updateSelectInput(session, "rtcol", choices = rv$col, selected = rv$col[guess.rt[1]])
     
     guess.name <- c(which(grepl("ID", colnames(P_data()))), which(grepl("name", colnames(P_data()))))
-    updateSelectInput(session, "IDcol", choices = rv$col, selected = rv$col[guess.name])
+    updateSelectInput(session, "IDcol", choices = rv$col, selected = rv$col[guess.name[1]])
     
     guess.mode <- c(which(grepl("Polarity", colnames(P_data()))), which(grepl("ESI", colnames(P_data()))))
-    updateSelectInput(session, "ioncol", choices = rv$col, selected = rv$col[guess.mode])
+    updateSelectInput(session, "ioncol", choices = rv$col, selected = rv$col[guess.mode[1]])
     
     guess.file <- c(which(grepl("Sample", colnames(P_data()))), which(grepl("File", colnames(P_data()))))
-    updateSelectInput(session, "MS2filecol", choices = rv$col, selected = rv$col[guess.file])
+    updateSelectInput(session, "MS2filecol", choices = rv$col, selected = rv$col[guess.file[1]])
     
     guess.ref <- c(which(grepl("Reference", colnames(P_data()))), which(grepl("ref", colnames(P_data()))))
-    updateSelectInput(session, "reffilecol", choices = rv$col, selected = rv$col[guess.ref])
+    updateSelectInput(session, "reffilecol", choices = rv$col, selected = rv$col[guess.ref[1]])
     
   })
  
