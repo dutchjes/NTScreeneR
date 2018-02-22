@@ -109,7 +109,7 @@ server <- function(input, output, session){
     
     mzlimits <- ppm(precursor.mz, mztol, l = TRUE)
     ms2.scans <- which(hd.ms2$precursorMZ < mzlimits[1] & hd.ms2$precursorMZ > mzlimits[2])
-    if(length(ms2.scans)==0){return(NULL)}
+    if(length(ms2.scans)==0){return(as.data.frame(cbind(scan.nm = 0, ms2.rt = 0, eic.int = 0)))}
 
     eic.int <- as.numeric(as.character(hd.ms2$precursorIntensity[ms2.scans]))
     ms2.rt <- as.numeric(as.character(hd.ms2$retentionTime[ms2.scans]))
@@ -370,18 +370,16 @@ server <- function(input, output, session){
   })
   
   observeEvent(input$processMS2, {
-    
     if(input$htot == TRUE){
-      
       pdf(file = paste(input$MS2outputdir, "\\", "HeadtoTailMS2.pdf", sep = ""))
       
       for(i in 1:length(rv$ms2.files)){
-        
+        print(i)
         ### sample file
         if(grepl(".mzXML", rv$ms2.files[i]))
           process.file <- which(grepl(paste(rv$ms2.files[i]), rv$filename) > 0)
         else
-          process.file <- which(paste(rv$ms2.files[i], ".mzXML", sep = "", rv$filename))
+          process.file <- which(paste(rv$ms2.files[i], ".mzXML", sep = "") == rv$filename)
         
         output$status <- renderText({paste("Working with file", rv$ms2.files[i], sep = " ")})
         rv$f <- readmzXML(file.path = rv$filepath[process.file], mode = "onDisk")
@@ -390,8 +388,12 @@ server <- function(input, output, session){
         rv$ms2.data <- findMS2(rv$f[[1]][[2]], rv$f[[2]][[2]], rv$masses[i], input$masstol)
         rtlims <- rtbounds(rv$rts_sec[i], input$rtwind)
         rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
-        
-        if(is.null(rv$ms2.data)==TRUE)
+        # if(!is.null(rv$ms2.data)){
+           if(nrow(rv$ms2.data)==0)
+             rv$ms2.data <- as.data.frame(cbind(0,0,0))
+        # }
+
+        if(rv$ms2.data[1,1] == 0)
           rv$spec.file <- NA
         else{
           
@@ -414,9 +416,10 @@ server <- function(input, output, session){
               
               for(k in 1:nrow(rv$ms2.data)){
                 
+                rv$spec.file[[k]] <- list(c(0))
                 rv$spec.file[[k]] <- rv$f[[2]][[1]][[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]]
-                ce <- rv$f[[2]][[2]]$collisionEnergy[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]
-                id.file[k] <- paste(rv$features[i], "_NCE", ce, "_", formatC(max(as.data.frame(rv$spec.file[[k]])$i), format = "e", 1), "_", rv$ms2.files[i], sep = "")
+                ce[k] <- rv$f[[2]][[2]]$collisionEnergy[which(rv$f[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]
+                id.file[k] <- paste(rv$features[i], "_NCE", ce[k], "_", formatC(max(as.data.frame(rv$spec.file[[k]])$i), format = "e", 1), "_", rv$ms2.files[i], sep = "")
               }
           }
         }
@@ -425,15 +428,20 @@ server <- function(input, output, session){
         if(grepl(".mzXML", rv$ref.files[i]))
           ref.file <- which(grepl(paste(rv$ref.files[i]), rv$filename) > 0)
         else
-          ref.file <- which(paste(rv$ref.files[i], ".mzXML", sep = "", rv$filename))
+          ref.file <- which(paste(rv$ref.files[i], ".mzXML", sep = "") == rv$filename)
         
         output$status <- renderText({paste("Working with file", rv$ref.files[i], sep = " ")})
         rv$r <- readmzXML(file.path = rv$filepath[ref.file], mode = "onDisk")
         rv$ms2.data <- findMS2(rv$r[[1]][[2]], rv$r[[2]][[2]], rv$masses[i], input$masstol)
         rtlims <- rtbounds(rv$rts_sec[i], input$rtwind)
         rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rtlims[1] & rv$ms2.data[,2] < rtlims[2])
+
+        # if(!is.null(rv$ms2.data)){
+           if(nrow(rv$ms2.data)==0)
+             rv$ms2.data <- as.data.frame(cbind(0,0,0))
+        # }
         
-        if(is.null(rv$ms2.data)==TRUE)
+        if(rv$ms2.data[1,1]==0)
           rv$spec.ref <- NA
         else{
           
@@ -456,9 +464,10 @@ server <- function(input, output, session){
             
             for(k in 1:nrow(rv$ms2.data)){
               
+              rv$spec.ref[[k]] <- list(c(0))
               rv$spec.ref[[k]] <- rv$r[[2]][[1]][[which(rv$r[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]]
-              ce <- rv$r[[2]][[2]]$collisionEnergy[which(rv$r[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]
-              id.ref[k] <- paste(rv$features[i], "_NCE", ce, "_", formatC(max(as.data.frame(rv$spec.ref[[k]])$i), format = "e", 1), "_", rv$ref.files[i], sep = "")
+              ce[k] <- rv$r[[2]][[2]]$collisionEnergy[which(rv$r[[2]][[2]]$acquisitionNum == rv$ms2.data[,1][k])]
+              id.ref[k] <- paste(rv$features[i], "_NCE", ce[k], "_", formatC(max(as.data.frame(rv$spec.ref[[k]])$i), format = "e", 1), "_", rv$ref.files[i], sep = "")
             }
           }
         }
@@ -469,7 +478,7 @@ server <- function(input, output, session){
             myHeadtoTail(sample.spectrum = as.data.frame(rv$spec.file), ref.spectrum = as.data.frame(rv$spec.ref),
                          y = input$MSMS_y, z = input$MSMS_z, t = input$MSMS_t, b = input$MSMS_b, id.file = id.file, id.ref = id.ref)
             
-            sink(paste(input$MS2outputdir,"\\", id.file, ".txt", sep = ""))
+            sink(paste(input$MS2outputdir,"\\", id.file, "_", id.ref, ".txt", sep = ""))
             print(rv$spec.file)
             print(as.data.frame(rv$spec.file))
             print(rv$spec.ref)
@@ -479,7 +488,7 @@ server <- function(input, output, session){
           
           if(input$whichMSMS == "all MS2 scans in selected RT range"){
             
-            sink(paste(input$MS2outputdir,"\\AllMS2scans.txt", sep = ""))
+            #sink(paste(input$MS2outputdir,"\\AllMS2scans.txt", sep = ""))
             
             for(k in 1:length(rv$spec.file)){
               
@@ -489,13 +498,15 @@ server <- function(input, output, session){
                              y = input$MSMS_y, z = input$MSMS_z, t = input$MSMS_t, b = input$MSMS_b, 
                              id.file = id.file[k], id.ref = id.ref[l])
                 
+                sink(paste(input$MS2outputdir,"\\", id.file[k],"_", id.ref[k], ".txt", sep = ""))
                 print(rv$spec.file[[k]])
                 print(as.data.frame(rv$spec.file[[k]]))
                 print(rv$spec.ref[[l]])
                 print(as.data.frame(rv$spec.ref[[l]]))
+                sink()
               }
             }
-            sink()
+            #sink()
           }
         }
         else
@@ -510,18 +521,24 @@ server <- function(input, output, session){
       pdf(file = paste(input$MS2outputdir, "\\", "ExtractedMS2s.pdf", sep = ""))
       
       for(i in 1:length(rv$ms2.files)){
-        
+        print(i)
         if(grepl(".mzXML", rv$ref.files[i]))
           process.file <- which(grepl(paste(rv$ms2.files[i]), rv$filename) > 0)
         else
-          process.file <- which(paste(rv$ms2.files[i], ".mzXML", sep = "", rv$filename))
+          process.file <- which(paste(rv$ms2.files[i], ".mzXML", sep = "") == rv$filename)
         
         output$status <- renderText({paste("Working with file", rv$ms2.files[i], sep = " ")})
         rv$f <- readmzXML(rv$filepath[process.file], mode = "onDisk")
         rt.lims <- c(min(rtime(rv$f[[1]][[1]])),max(rtime(rv$f[[1]][[1]])))
         eic <- chromatogram(rv$f[[1]][[1]], rt = rt.lims, mz = ppm(rv$masses[i], input$masstol, l = TRUE))
         rv$ms2.data <- findMS2(rv$f[[1]][[2]], rv$f[[2]][[2]], rv$masses[i], input$masstol)
-        if(is.null(rv$ms2.data)[1]==TRUE)
+        
+        # if(!is.null(rv$ms2.data)){
+           if(nrow(rv$ms2.data)==0)
+             rv$ms2.data <- as.data.frame(cbind(0,0,0))
+        # }
+        
+        if(rv$ms2.data[1,1]==0)
           next
         else{
           rtlims <- rtbounds(rv$rts_sec[i], input$rtwind)
@@ -545,10 +562,10 @@ server <- function(input, output, session){
               }
             }
           }
-        }
+      }
+      dev.off()
       };
       
-      dev.off()
       output$status <- renderText({"Finished building MS2 pdfs"})
   })
   
@@ -593,5 +610,4 @@ server <- function(input, output, session){
 }
 
 shinyApp(ui = ui, server = server)
-
 
