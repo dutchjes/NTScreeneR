@@ -383,24 +383,25 @@ server <- function(input, output, session){
   })
   
   observeEvent(input$processMS2, {
-    
+    browser()
     if(input$htot == TRUE){
       
       pdf(file = paste(input$MS2outputdir, "\\", "HeadtoTailMS2.pdf", sep = ""))
       
       for(i in 1:length(rv$ms2.files)){
         
+        print(i)
         ### sample file
         if(grepl(".mzXML", rv$ms2.files[i]))
           process.file <- which(grepl(paste(rv$ms2.files[i]), rv$filename) > 0)
         else
-          process.file <- which(paste(rv$ms2.files[i], ".mzXML", sep = "", rv$filename))
+          process.file <- which(paste(rv$ms2.files[i], ".mzXML", sep = "") == rv$filename)
         
         output$status <- renderText({paste("Working with file", rv$ms2.files[i], sep = " ")})
         rv$f <- readmzXML(file.path = rv$filepath[process.file], mode = "onDisk")
         
         if(input$useRT == TRUE){
-          rt.lims <- rtbounds(rv$rts_sec[process.feature], input$rtwind)
+          rt.lims <- rtbounds(rv$rts_sec[i], input$rtwind)
         }else{
           rt.lims <- c(min(rtime(rv$f[[1]][[1]])),max(rtime(rv$f[[1]][[1]])))
         }
@@ -443,13 +444,13 @@ server <- function(input, output, session){
         if(grepl(".mzXML", rv$ref.files[i]))
           ref.file <- which(grepl(paste(rv$ref.files[i]), rv$filename) > 0)
         else
-          ref.file <- which(paste(rv$ref.files[i], ".mzXML", sep = "", rv$filename))
+          ref.file <- which(paste(rv$ref.files[i], ".mzXML", sep = "") == rv$filename)
         
         output$status <- renderText({paste("Working with file", rv$ref.files[i], sep = " ")})
         rv$r <- readmzXML(file.path = rv$filepath[ref.file], mode = "onDisk")
         
         if(input$useRT == TRUE){
-          rt.lims <- rtbounds(rv$rts_sec[process.feature], input$rtwind)
+          rt.lims <- rtbounds(rv$rts_sec[i], input$rtwind)
         }else{
           rt.lims <- c(min(rtime(rv$r[[1]][[1]])),max(rtime(rv$r[[1]][[1]])))
         }
@@ -534,11 +535,11 @@ server <- function(input, output, session){
       pdf(file = paste(input$MS2outputdir, "\\", "ExtractedMS2s.pdf", sep = ""))
       
       for(i in 1:length(rv$ms2.files)){
-        
+        print(i)
         if(grepl(".mzXML", rv$ref.files[i]))
           process.file <- which(grepl(paste(rv$ms2.files[i]), rv$filename) > 0)
         else
-          process.file <- which(paste(rv$ms2.files[i], ".mzXML", sep = "", rv$filename))
+          process.file <- which(paste(rv$ms2.files[i], ".mzXML", sep = "") == rv$filename)
         
         output$status <- renderText({paste("Working with file", rv$ms2.files[i], sep = " ")})
         rv$f <- readmzXML(rv$filepath[process.file], mode = "onDisk")
