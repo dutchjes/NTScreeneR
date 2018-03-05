@@ -383,9 +383,7 @@ server <- function(input, output, session){
   })
   
   observeEvent(input$processMS2, {
-    browser()
     if(input$htot == TRUE){
-      
       pdf(file = paste(input$MS2outputdir, "\\", "HeadtoTailMS2.pdf", sep = ""))
       
       for(i in 1:length(rv$ms2.files)){
@@ -409,7 +407,7 @@ server <- function(input, output, session){
         rv$ms2.data <- findMS2(rv$f[[1]][[2]], rv$f[[2]][[2]], rv$masses[i], input$masstol)
         rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rt.lims[1] & rv$ms2.data[,2] < rt.lims[2])
         
-        if(is.null(rv$ms2.data)==TRUE)
+        if(is.null(rv$ms2.data)==TRUE || nrow(rv$ms2.data) < 1)
           rv$spec.file <- NA
         else{
           
@@ -430,6 +428,7 @@ server <- function(input, output, session){
 
               ce <- c()
               id.file <- c()
+              rv$spec.file <- list(c())
               
               for(k in 1:nrow(rv$ms2.data)){
                 
@@ -458,7 +457,7 @@ server <- function(input, output, session){
         rv$ms2.data <- findMS2(rv$r[[1]][[2]], rv$r[[2]][[2]], rv$masses[i], input$masstol)
         rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rt.lims[1] & rv$ms2.data[,2] < rt.lims[2])
         
-        if(is.null(rv$ms2.data)==TRUE)
+        if(is.null(rv$ms2.data)==TRUE || nrow(rv$ms2.data) < 1)
           rv$spec.ref <- NA
         else{
           
@@ -478,6 +477,7 @@ server <- function(input, output, session){
           if(input$whichMSMS=="all MS2 scans in selected RT range"){
             ce <- c()
             id.ref <- c()
+            rv$spec.ref <- list(c())
             
             for(k in 1:nrow(rv$ms2.data)){
               
