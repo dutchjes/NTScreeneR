@@ -316,7 +316,7 @@ server <- function(input, output, session){
   observeEvent(input$createEIC,{
 
     process.file2 <- which(rv$filename == input$RAWFileEIC)
-    process.feature <- which(rv$features == input$feature)
+    process.feature <- which(rv$features == input$feature) ### will need to fix the problem of multiple features which are the same
     
     if(length(process.file2) == 0){output$status <- renderText({"Waiting for mzXML files..."})}
     if(length(process.feature) == 0){output$status <- renderText({"Waiting for suspect list..."})}
@@ -328,18 +328,17 @@ server <- function(input, output, session){
       rv$f <- readmzXML(rv$filepath[process.file2], mode = "onDisk")
 
     if(input$useRT == TRUE){
-      rt.lims <- rtbounds(rv$rts_sec[process.feature], input$rtwind)
+      rt.lims <- rtbounds(rv$rts_sec[process.feature[1]], input$rtwind)
     }else{
       rt.lims <- c(min(rtime(rv$f[[1]][[1]])),max(rtime(rv$f[[1]][[1]])))
     }
       
-      eic <- chromatogram(rv$f[[1]][[1]], rt = rt.lims, mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
-      rv$ms2.data <- findMS2(rv$f[[1]][[2]], rv$f[[2]][[2]], rv$masses[process.feature], input$masstol) 
+      eic <- chromatogram(rv$f[[1]][[1]], rt = rt.lims, mz = ppm(rv$masses[process.feature[1]], input$masstol, l = TRUE))
+      rv$ms2.data <- findMS2(rv$f[[1]][[2]], rv$f[[2]][[2]], rv$masses[process.feature[1]], input$masstol) 
       rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rt.lims[1] & rv$ms2.data[,2] < rt.lims[2])
-      
-    output$EIC <- renderPlot({myXIC(eic = eic, ms2.data = rv$ms2.data, exp.rt = rv$rts_sec[process.feature])})
-    
-    if(nrow(rv$ms2.data) > 0){
+    output$EIC <- renderPlot({myXIC(eic = eic, ms2.data = rv$ms2.data, exp.rt = rv$rts_sec[process.feature[1]])})
+
+        if(!is.null(rv$ms2.data) & nrow(rv$ms2.data) > 0 ){
       updateSelectInput(session, "selectedMSMS", choices = rv$ms2.data[,1])
       output$availMSMSscans <- renderTable({rv$ms2.data})
       observeEvent(input$selectedMSMS, 
@@ -348,7 +347,7 @@ server <- function(input, output, session){
                    })
       )
     }
-    output$Compound <- renderText({paste(rv$names[process.feature])})
+    output$Compound <- renderText({paste(rv$names[process.feature[1]])})
     output$status <- renderText({"Finished"})
     }
   })
