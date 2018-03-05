@@ -130,15 +130,31 @@ server <- function(input, output, session){
     
   }
   
+  t_col <- function(color, percent = 50, name = NULL) {
+    #	  color = color name
+    #	percent = % transparency
+    #	   name = an optional name for the color
+    ## Get RGB values for named color
+    rgb.val <- col2rgb(color)
+    ## Make new color using input color as base and alpha set by transparency
+    t.col <- rgb(rgb.val[1], rgb.val[2], rgb.val[3],
+                 max = 255,
+                 alpha = (100-percent)*255/100,
+                 names = name)
+    ## Save the color
+    invisible(t.col)
+    
+  }
+  
   myXIC <- function(eic, ms2.data, exp.rt){
     
     plot(eic)
     abline(v = exp.rt, col = "blue")
     
-    if(nrow(ms2.data) < 1)
+    if(nrow(ms2.data) < 1 || is.null(ms2.data))
       legend("topleft", legend = paste("No MS2 scans"))
     else
-      points(ms2.data[,2:3], col = "red", pch = 16)
+      points(ms2.data[,2:3], col = t_col("red", 50), pch = 16, type = "h", lty = 2)
   }
   
   myHeadtoTail <- function(sample.spectrum, ref.spectrum, y, z, t, b, id.file, id.ref){
