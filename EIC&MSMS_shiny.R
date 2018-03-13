@@ -607,7 +607,7 @@ server <- function(input, output, session){
         else
           rt.lims <- c(min(rtime(plotting.file[[1]][[1]])),max(rtime(plotting.file[[1]][[1]])))
           
-         eic <- chromatogram(ms1, rt = rt.lims, mz = ppm(rv$masses[index], input$masstol, l = TRUE))
+         eic <- chromatogram(plotting.file[[1]][[1]], rt = rt.lims, mz = ppm(rv$masses[index], input$masstol, l = TRUE))
          ms2.data <- findMS2(plotting.file[[1]][[2]], plotting.file[[2]][[2]], rv$masses[index], input$masstol)
          myXIC(eic = eic, ms2.data = ms2.data, exp.rt = rv$rts_sec[index])
       
