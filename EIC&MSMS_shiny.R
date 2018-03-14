@@ -245,7 +245,7 @@ server <- function(input, output, session){
   observeEvent(input$P_data,{
     rv$col <- colnames(P_data())
     
-    guess.mass <- c(which(grepl("Mass", colnames(P_data()))), which(grepl("mz", colnames(P_data()))))
+    guess.mass <- c(which(grepl("Mass", colnames(P_data()))), which(grepl("m.z", colnames(P_data()))))
     updateSelectInput(session, "masscol", choices = rv$col, selected = rv$col[guess.mass[1]])
     
     guess.rt <- c(which(grepl("RT", colnames(P_data()))), which(grepl("retention", colnames(P_data()))))
@@ -254,7 +254,7 @@ server <- function(input, output, session){
     guess.name <- c(which(grepl("ID", colnames(P_data()))), which(grepl("name", colnames(P_data()))))
     updateSelectInput(session, "IDcol", choices = rv$col, selected = rv$col[guess.name[1]])
     
-    guess.mode <- c(which(grepl("Polarity", colnames(P_data()))), which(grepl("ESI", colnames(P_data()))))
+    guess.mode <- c(which(grepl("mode", colnames(P_data()))), which(grepl("ESI", colnames(P_data()))))
     updateSelectInput(session, "ioncol", choices = rv$col, selected = rv$col[guess.mode[1]])
     
     guess.file <- c(which(grepl("Sample", colnames(P_data()))), which(grepl("File", colnames(P_data()))))
