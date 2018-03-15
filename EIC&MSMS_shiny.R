@@ -376,7 +376,7 @@ server <- function(input, output, session){
     if(input$useRT == TRUE){
       rt.lims <- rtbounds(rv$rts_sec[process.feature[1]], input$rtwind)
     }else{
-      rt.lims <- c(min(rtime(rv$f[[1]][[1]])),max(rtime(rv$f[[1]][[1]])))
+      rt.lims <- c(min(rtime(ms1.file)),max(rtime(ms1.file)))
     }
       
       eic <- chromatogram(ms1.file, rt = rt.lims, mz = ppm(rv$masses[process.feature], input$masstol, l = TRUE))
@@ -384,7 +384,7 @@ server <- function(input, output, session){
       rv$ms2.data <- subset(rv$ms2.data, rv$ms2.data[,2] > rt.lims[1] & rv$ms2.data[,2] < rt.lims[2])
       output$EIC <- renderPlot({myXIC(eic = eic, ms2.data = rv$ms2.data, exp.rt = rv$rts_sec[process.feature])})
 
-        if(!is.null(rv$ms2.data) & nrow(rv$ms2.data) > 0 ){
+        if(!is.null(rv$ms2.data)){
       updateSelectInput(session, "selectedMSMS", choices = rv$ms2.data[,1])
       output$availMSMSscans <- renderTable({rv$ms2.data})
       observeEvent(input$selectedMSMS, 
