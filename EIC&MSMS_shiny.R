@@ -106,7 +106,7 @@ t_col <- function(color, percent = 50, name = NULL) {
   
 }
 
-myXIC <- function(eic, ms2.data, exp.rt){
+myXIC <- function(eic, ms2.data, exp.rt,...){
   
   plot(eic)
   abline(v = exp.rt, col = "blue")
