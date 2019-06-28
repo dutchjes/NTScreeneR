@@ -139,3 +139,28 @@ blankDetect <- function(profiles, blank.code){
   profiles$index_prof[bk.profs,"in_blind?"] <- TRUE
   
 }
+
+### extracts the spectra with RMassBank of the desired profile
+getComponent <- function(profileID, spectra){
+  
+  loc <- which(spectra@aggregated$profile == profileID)
+  loc2 <- as.numeric(spectra@aggregated[loc,]$cpdID)
+  data <- getData(spectra@spectra[[loc2]]@children[[1]])
+  return(data)
+}
+
+### plots MS1 or MS2
+plotComponent <- function(component.data, ...){
+  plot.new()
+  plot.window(ylim = c(0, max(component.data$intensity)*1.2), xlim = c(0,max(component.data$mz)*1.5), xlab = "m/z", ylab = "Absolute intensity")
+  points(component.data$mz, component.data$intensity, type = "h", lwd = 2)
+  text(component.data$mz, component.data$intensity, labels = round(component.data$mz,4), pos = 3, offset = 1.5)
+  text(component.data$mz, component.data$intensity, labels = component.data$profile, pos = 3)
+  box()
+  axis(1)
+  axis(2)
+  title("Plot RAMClust Component", xlab="m/z",
+        ylab="Absolute intensity")
+}
+
+
