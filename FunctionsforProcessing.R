@@ -1,7 +1,7 @@
 
 
 #### Functions for HRMS(MS)
-### Extensions to either MSnbase or enviMass
+### Extensions to either MSnbase, enviMass, RMassScreening or RAMClustR
 
 ### MSnbase
 
@@ -155,6 +155,18 @@ RTfilter <- function(expected.rt, measured.rt, rttol){
   
   return(match)
 }
+
+
+### for finding nontargets with a certain increase between two groups. based on RMassScreening output totalTable
+IntIncrease <- function(totalTable, nm.OTP.cols, nm.parent.col, factor.increase = 2){
+  
+  OTP.sums <- rowSums(totalTable[,colnames(totalTable) %in% nm.OTP.cols])
+  par.sum <- totalTable[,colnames(totalTable) %in% nm.parent.col]
+  posOTP <- OTP.sums * factor.increase > par.sum
+  return(posOTP)
+  
+}
+
 
 ### extracts the spectra with RMassBank of the desired profile
 getComponent <- function(profileID, spectra){
