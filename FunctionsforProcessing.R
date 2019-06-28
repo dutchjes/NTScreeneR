@@ -140,6 +140,22 @@ blankDetect <- function(profiles, blank.code){
   
 }
 
+
+#### RAMClustR and RMassScreening
+### get component associated with profile and plot
+
+### for checking RT of suspects. just adds TRUE/FALSE if measured.rt within window of expected.rt
+RTfilter <- function(expected.rt, measured.rt, rttol){
+  
+  match <- c()
+  if(measured.rt > expected.rt - rttol && measured.rt < expected.rt + rttol)
+    match <- TRUE
+  else
+    match <- FALSE
+  
+  return(match)
+}
+
 ### extracts the spectra with RMassBank of the desired profile
 getComponent <- function(profileID, spectra){
   
